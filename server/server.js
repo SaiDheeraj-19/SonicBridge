@@ -93,7 +93,7 @@ wss.on('connection', (ws) => {
                     room.sarvamWs = await sarvamService.createSttStream(
                         {
                             language_code: data.sourceLang,
-                            model: 'saaras:v3'
+                            model: 'saaras:v2.5'
                         },
                         async (result) => {
                             // Extract primary translation (which defaults to English output from STT-Translate)

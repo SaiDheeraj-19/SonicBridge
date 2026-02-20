@@ -21,7 +21,7 @@ class SarvamService {
     async createSttStream(options, onTranscript, onError) {
         const {
             language_code = 'hi-IN',
-            model = 'saaras:v3',
+            model = 'saaras:v2.5',
         } = options;
 
         const url = `${SARVAM_STT_URL}?language_code=${language_code}&model=${model}`;
