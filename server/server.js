@@ -16,56 +16,128 @@ app.use(express.json());
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
+// Room logic
+class Room {
+    constructor(roomId, hostWs) {
+        this.roomId = roomId;
+        this.hostWs = hostWs;
+        this.users = []; // Array of { ws, language }
+        this.sarvamWs = null;
+    }
+}
+
+const rooms = new Map();
+
 wss.on('connection', (ws) => {
     console.log('Client connected to SonicBridge WebSocket');
 
-    let sarvamWs = null;
-    let currentTargetLang = 'en-IN';
+    let currentRoomId = null;
+    let isHost = false;
 
     ws.on('message', async (message, isBinary) => {
-        // Handle JSON messages (configuration)
         if (!isBinary) {
             try {
                 const data = JSON.parse(message.toString());
 
-                if (data.type === 'start') {
-                    currentTargetLang = data.targetLang || 'en-IN';
-                    console.log(`Starting session: ${data.sourceLang} -> ${currentTargetLang}`);
+                if (data.type === 'createRoom') {
+                    const roomId = data.roomId;
+                    if (!rooms.has(roomId)) {
+                        rooms.set(roomId, new Room(roomId, ws));
+                    } else {
+                        rooms.get(roomId).hostWs = ws; // Override if reconnecting
+                    }
+                    currentRoomId = roomId;
+                    isHost = true;
+                    console.log(`Room created: ${roomId}`);
+                    ws.send(JSON.stringify({ type: 'roomCreated', roomId }));
+                }
+                else if (data.type === 'joinRoom') {
+                    const roomId = data.roomId;
+                    if (rooms.has(roomId)) {
+                        const room = rooms.get(roomId);
+                        room.users.push({ ws, language: data.targetLang });
+                        currentRoomId = roomId;
+                        console.log(`User joined room ${roomId} with language ${data.targetLang}`);
+                        ws.send(JSON.stringify({ type: 'joined', roomId }));
+                    } else {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+                    }
+                }
+                else if (data.type === 'updateLanguage') {
+                    if (currentRoomId && rooms.has(currentRoomId) && !isHost) {
+                        const room = rooms.get(currentRoomId);
+                        const user = room.users.find(u => u.ws === ws);
+                        if (user) {
+                            user.language = data.targetLang;
+                            console.log(`User updated language to ${data.targetLang} in room ${currentRoomId}`);
+                        }
+                    }
+                }
+                else if (data.type === 'start') {
+                    if (!isHost || !currentRoomId || !rooms.has(currentRoomId)) return;
 
-                    sarvamWs = await sarvamService.createSttStream(
+                    const room = rooms.get(currentRoomId);
+                    console.log(`Host starting stream in room: ${currentRoomId} from ${data.sourceLang}`);
+
+                    room.sarvamWs = await sarvamService.createSttStream(
                         {
                             language_code: data.sourceLang,
-                            mode: 'translate' // Translate to target immediately if possible
+                            model: 'saaras:v2.5'
                         },
                         async (result) => {
-                            // Handle Sarvam STT Response
-                            // Result format: { transcript: "...", translate: "...", is_final: true/false }
-                            if (result.transcript) {
-                                ws.send(JSON.stringify({ type: 'transcript', text: result.transcript }));
+                            // Extract primary translation (which defaults to English output from STT-Translate)
+                            const text = result.transcript || result.translate;
+
+                            // Send host the raw transcription text
+                            if (text) {
+                                room.hostWs.send(JSON.stringify({ type: 'transcript', text: text }));
                             }
 
-                            if (result.translate) {
-                                ws.send(JSON.stringify({ type: 'translation', text: result.translate }));
+                            // Only process translation/TTS for final phrases to save performance
+                            if (result.is_final && text && text.trim().length > 0) {
+                                // Find unique languages requested in the room
+                                const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
 
-                                // If we have a meaningful translated chunk and it's final (or a complete sentence)
-                                if (result.is_final && result.translate.trim().length > 0) {
+                                // Optimization: Process each language ONCE
+                                for (const targetLanguage of uniqueLanguages) {
                                     try {
-                                        const audioBuffer = await sarvamService.textToSpeech(result.translate, currentTargetLang);
-                                        ws.send(audioBuffer);
-                                    } catch (ttsErr) {
-                                        console.error('TTS execution failed:', ttsErr.message);
+                                        // 1. Translate
+                                        const translatedText = await sarvamService.translateText(text, targetLanguage);
+
+                                        // 2. TTS
+                                        const audioBuffer = await sarvamService.textToSpeech(translatedText, targetLanguage);
+
+                                        // 3. Broadcast to all users requesting this language
+                                        room.users.forEach(user => {
+                                            if (user.language === targetLanguage && user.ws.readyState === 1) {
+                                                user.ws.send(JSON.stringify({ type: 'translation', text: translatedText }));
+                                                user.ws.send(audioBuffer);
+                                            }
+                                        });
+                                    } catch (err) {
+                                        console.error(`Pipeline failed for ${targetLanguage}:`, err.message);
+                                        // Fallback logic
+                                        room.users.forEach(user => {
+                                            if (user.language === targetLanguage && user.ws.readyState === 1) {
+                                                user.ws.send(JSON.stringify({ type: 'translation', text: text })); // Send original english text
+                                            }
+                                        });
                                     }
                                 }
                             }
                         },
                         (error) => {
-                            ws.send(JSON.stringify({ type: 'error', message: 'Sarvam STT failed' }));
+                            room.hostWs.send(JSON.stringify({ type: 'error', message: 'STT failed' }));
                         }
                     );
-                } else if (data.type === 'stop') {
-                    if (sarvamWs) {
-                        sarvamWs.close();
-                        sarvamWs = null;
+                }
+                else if (data.type === 'stop') {
+                    if (isHost && currentRoomId && rooms.has(currentRoomId)) {
+                        const room = rooms.get(currentRoomId);
+                        if (room.sarvamWs) {
+                            room.sarvamWs.close();
+                            room.sarvamWs = null;
+                        }
                     }
                 }
             } catch (e) {
@@ -75,38 +147,52 @@ wss.on('connection', (ws) => {
         }
 
         // Handle binary audio data
-        if (isBinary && sarvamWs && sarvamWs.readyState === 1) {
-            // Add a proper WAV header to the raw PCM chunk
-            const dataLength = message.length;
-            const buffer = Buffer.alloc(44);
-            buffer.write('RIFF', 0);
-            buffer.writeUInt32LE(dataLength + 36, 4);
-            buffer.write('WAVE', 8);
-            buffer.write('fmt ', 12);
-            buffer.writeUInt32LE(16, 16); // Subchunk1Size
-            buffer.writeUInt16LE(1, 20); // AudioFormat (PCM)
-            buffer.writeUInt16LE(1, 22); // NumChannels
-            buffer.writeUInt32LE(16000, 24); // SampleRate
-            buffer.writeUInt32LE(16000 * 1 * 16 / 8, 28); // ByteRate
-            buffer.writeUInt16LE(1 * 16 / 8, 32); // BlockAlign
-            buffer.writeUInt16LE(16, 34); // BitsPerSample
-            buffer.write('data', 36);
-            buffer.writeUInt32LE(dataLength, 40);
+        if (isBinary && isHost && currentRoomId && rooms.has(currentRoomId)) {
+            const room = rooms.get(currentRoomId);
+            if (room.sarvamWs && room.sarvamWs.readyState === 1) {
+                const dataLength = message.length;
+                const buffer = Buffer.alloc(44);
+                buffer.write('RIFF', 0);
+                buffer.writeUInt32LE(dataLength + 36, 4);
+                buffer.write('WAVE', 8);
+                buffer.write('fmt ', 12);
+                buffer.writeUInt32LE(16, 16);
+                buffer.writeUInt16LE(1, 20);
+                buffer.writeUInt16LE(1, 22);
+                buffer.writeUInt32LE(16000, 24);
+                buffer.writeUInt32LE(16000 * 1 * 16 / 8, 28);
+                buffer.writeUInt16LE(1 * 16 / 8, 32);
+                buffer.writeUInt16LE(16, 34);
+                buffer.write('data', 36);
+                buffer.writeUInt32LE(dataLength, 40);
 
-            const wavBuffer = Buffer.concat([buffer, message]);
+                const wavBuffer = Buffer.concat([buffer, message]);
 
-            sarvamWs.send(JSON.stringify({
-                audio: {
-                    data: wavBuffer.toString('base64'),
-                    encoding: "audio/wav",
-                    sample_rate: 16000
-                }
-            }));
+                room.sarvamWs.send(JSON.stringify({
+                    audio: {
+                        data: wavBuffer.toString('base64'),
+                        encoding: "audio/wav",
+                        sample_rate: 16000
+                    }
+                }));
+            }
         }
     });
 
     ws.on('close', () => {
-        if (sarvamWs) sarvamWs.close();
+        if (currentRoomId && rooms.has(currentRoomId)) {
+            const room = rooms.get(currentRoomId);
+            if (isHost) {
+                // Host left, clean up
+                if (room.sarvamWs) room.sarvamWs.close();
+                rooms.delete(currentRoomId);
+                console.log(`Room ${currentRoomId} deleted as host left.`);
+            } else {
+                // User left
+                room.users = room.users.filter(u => u.ws !== ws);
+                console.log(`User left room ${currentRoomId}. ${room.users.length} remaining.`);
+            }
+        }
         console.log('Client disconnected');
     });
 });

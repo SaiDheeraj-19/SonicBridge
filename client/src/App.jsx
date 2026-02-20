@@ -3,15 +3,14 @@ import { useAudioRecorder } from './hooks/useAudioRecorder';
 import { useWebSocket } from './hooks/useWebSocket';
 
 const LANGUAGES = [
-  { code: 'hi-IN', name: 'Hindi' },
-  { code: 'es-ES', name: 'Spanish' },
-  { code: 'fr-FR', name: 'French' },
-  { code: 'ja-JP', name: 'Japanese' },
   { code: 'en-IN', name: 'English' },
+  { code: 'hi-IN', name: 'Hindi' },
   { code: 'te-IN', name: 'Telugu' },
   { code: 'ta-IN', name: 'Tamil' },
   { code: 'kn-IN', name: 'Kannada' },
   { code: 'ml-IN', name: 'Malayalam' },
+  { code: 'mr-IN', name: 'Marathi' },
+  { code: 'bn-IN', name: 'Bengali' },
 ];
 
 function App() {
@@ -20,7 +19,7 @@ function App() {
 
   // Connection & Translation states
   const [sourceLang, setSourceLang] = useState('en-IN');
-  const [targetLang, setTargetLang] = useState('es-ES');
+  const [targetLang, setTargetLang] = useState('hi-IN');
   const [transcript, setTranscript] = useState('');
   const [translatedText, setTranslatedText] = useState('');
 
@@ -96,6 +95,12 @@ function App() {
 
   const { isConnected, sendMessage } = useWebSocket('ws://localhost:5001', onWebSocketMessage);
 
+  useEffect(() => {
+    if (currentView === 'participant' && roomCode) {
+      sendMessage(JSON.stringify({ type: 'updateLanguage', targetLang }));
+    }
+  }, [targetLang, currentView, roomCode, sendMessage]);
+
   const onAudioChunk = useCallback((chunk) => {
     sendMessage(chunk);
   }, [sendMessage]);
@@ -111,8 +116,7 @@ function App() {
       setTranslatedText('');
       sendMessage(JSON.stringify({
         type: 'start',
-        sourceLang,
-        targetLang
+        sourceLang
       }));
       await startRecording();
     }
@@ -183,7 +187,9 @@ function App() {
         {/* Create Room */}
         <div
           onClick={() => {
-            setRoomCode(`SB-${Math.floor(1000 + Math.random() * 9000)}`);
+            const newCode = `SB-${Math.floor(1000 + Math.random() * 9000)}`;
+            setRoomCode(newCode);
+            sendMessage(JSON.stringify({ type: 'createRoom', roomId: newCode }));
             setCurrentView('host');
           }}
           className="premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group"
@@ -211,7 +217,9 @@ function App() {
             <button
               onClick={() => {
                 if (joinCode) {
-                  setRoomCode(joinCode.toUpperCase());
+                  const upperCode = joinCode.toUpperCase();
+                  setRoomCode(upperCode);
+                  sendMessage(JSON.stringify({ type: 'joinRoom', roomId: upperCode, targetLang }));
                   setCurrentView('participant');
                 }
               }}

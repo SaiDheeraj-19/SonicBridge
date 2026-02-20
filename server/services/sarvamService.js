@@ -56,6 +56,48 @@ class SarvamService {
     }
 
     /**
+     * Translate text to target language
+     * @param {String} text
+     * @param {String} targetLanguageCode
+     * @returns {Promise<String>}
+     */
+    async translateText(text, targetLanguageCode) {
+        // Sarvam REST Translate endpoint currently supports translation between English and Indian languages
+        // Ensure source is en-IN if the STT output converts speech to English.
+        if (targetLanguageCode === 'en-IN') return text;
+
+        try {
+            const response = await fetch('https://api.sarvam.ai/translate', {
+                method: "POST",
+                headers: {
+                    "api-subscription-key": this.apiKey,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    input: text.trim(),
+                    source_language_code: "en-IN", // Assuming STT output is English or we normalize to English first
+                    target_language_code: targetLanguageCode,
+                    speaker_gender: "Female",
+                    mode: "formal",
+                    model: "mayura:v1",
+                    enable_preprocessing: true
+                })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Translate HTTP error! status: ${response.status}, msg: ${errText}`);
+            }
+
+            const data = await response.json();
+            return data.translated_text;
+        } catch (error) {
+            console.error('Sarvam Translate error:', error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Convert text to speech using Sarvam TTS (Streaming API via Option 2)
      * @param {String} text 
      * @param {String} targetLanguageCode 
