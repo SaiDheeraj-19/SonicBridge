@@ -216,9 +216,10 @@ function App() {
         </div>
       </div>
 
-      <footer className="flex w-full items-center justify-center gap-12 md:gap-24 z-10">
-        <button className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">ABOUT</button>
-        <button className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">LEGAL</button>
+      <footer className="flex w-full items-center justify-center gap-8 md:gap-16 z-10 flex-wrap">
+        <a href="https://docs.sarvam.ai/api-reference-docs/getting-started/quickstart" target="_blank" rel="noopener noreferrer" className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">DOCUMENTATION</a>
+        <button onClick={() => alert('About SonicBridge: Real-time translation powered by Sarvam AI.')} className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">ABOUT</button>
+        <button onClick={() => alert('Legal: All rights reserved.')} className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">LEGAL</button>
       </footer>
 
       <div className="fixed top-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
@@ -414,10 +415,8 @@ function App() {
       <header className="glass-header sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('portal')}>
-            <div className="w-8 h-8 flex items-center justify-center border border-black/10 dark:border-white/20 rounded-lg">
-              <span className="material-symbols-outlined text-black dark:text-primary-green text-xl">waves</span>
-            </div>
-            <span className="text-lg font-bold tracking-tight hidden sm:block">SonicBridge</span>
+            <div className="size-2 bg-charcoal dark:bg-white rounded-full"></div>
+            <h2 className="text-[13px] font-medium tracking-tight">SONICBRIDGE</h2>
           </div>
           <div className="h-4 w-[1px] bg-black/10 dark:bg-white/20 hidden md:block"></div>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
