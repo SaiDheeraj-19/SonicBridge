@@ -353,12 +353,6 @@ function App() {
     <div className="participant-bg text-charcoal dark:text-slate-100 min-h-screen flex flex-col w-full relative transition-colors duration-500">
       <header className="glass-header sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('portal')}>
-            <div className="w-8 h-8 flex items-center justify-center border border-black/10 dark:border-white/20 rounded-lg">
-              <span className="material-symbols-outlined text-black dark:text-primary-green text-xl">waves</span>
-            </div>
-            <span className="text-lg font-bold tracking-tight hidden sm:block">SonicBridge</span>
-          </div>
           <div className="h-4 w-[1px] bg-black/10 dark:bg-white/20 hidden md:block"></div>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
             <span className="relative flex h-2 w-2">
@@ -370,10 +364,10 @@ function App() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="relative group hidden sm:block">
-            <label className="absolute -top-2 left-3 px-1 bg-white dark:bg-black text-[10px] text-black/40 dark:text-slate-500 uppercase tracking-tighter">Target Language</label>
+          <div className="hidden sm:block">
+            <label className="block px-1 text-[10px] text-black/40 dark:text-slate-500 uppercase tracking-tighter mb-1">Target Language</label>
             <div className="flex items-center border border-black/10 dark:border-white/20 rounded-lg px-2 hover:border-black/30 dark:hover:border-white/40 transition-colors cursor-pointer bg-white/40 dark:bg-black/40">
-              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-sm font-medium w-full py-2 bg-transparent text-black dark:text-white outline-none appearance-none cursor-pointer">
+              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-sm font-medium w-full py-1.5 pr-6 bg-transparent text-black dark:text-white outline-none cursor-pointer">
                 {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-white text-black dark:bg-black dark:text-white">{l.name}</option>)}
               </select>
             </div>
