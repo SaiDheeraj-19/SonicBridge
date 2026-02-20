@@ -13,6 +13,10 @@ app = FastAPI(title="SonicBridge VAD & Speaker Verification Service")
 # During production, models are pulled from hugging face /speechbrain/spkrec-ecapa-voxceleb
 classifier = None
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "model": "speechbrain/spkrec-ecapa-voxceleb"}
+
 @app.on_event("startup")
 async def startup_event():
     global classifier

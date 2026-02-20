@@ -15,6 +15,11 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Health check for deployment monitoring
+app.get('/health', (req, res) => {
+    res.status(200).send('SonicBridge Backend Active');
+});
+
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
