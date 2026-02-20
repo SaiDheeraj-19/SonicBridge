@@ -21,7 +21,7 @@ class SarvamService {
     async createSttStream(options, onTranscript, onError) {
         const {
             language_code = 'hi-IN',
-            model = 'saaras:v2.5',
+            model = 'saaras:v3',
         } = options;
 
         const url = `${SARVAM_STT_URL}?language_code=${language_code}&model=${model}`;
@@ -77,10 +77,11 @@ class SarvamService {
                     input: text.trim(),
                     source_language_code: "en-IN", // Assuming STT output is English or we normalize to English first
                     target_language_code: targetLanguageCode,
-                    speaker_gender: "Female",
+                    speaker_gender: "Male",
                     mode: "formal",
                     model: "mayura:v1",
-                    enable_preprocessing: true
+                    enable_preprocessing: false,
+                    numerals_format: "native"
                 })
             });
 
@@ -114,7 +115,7 @@ class SarvamService {
                 body: JSON.stringify({
                     text: text,
                     target_language_code: targetLanguageCode,
-                    speaker: "aayan", // "aayan" as provided in snippet
+                    speaker: "shubh", // "shubh" per user request
                     model: "bulbul:v3", // upgraded to v3
                     pace: 1.1,
                     speech_sample_rate: 22050,
