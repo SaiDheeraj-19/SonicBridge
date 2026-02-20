@@ -7,25 +7,32 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from pydantic import BaseModel
 from speechbrain.inference.speaker import EncoderClassifier
 
-app = FastAPI(title="SonicBridge VAD & Speaker Verification Service")
+from contextlib import asynccontextmanager
 
 # Initialize SpeechBrain speaker recognition model natively
-# During production, models are pulled from hugging face /speechbrain/spkrec-ecapa-voxceleb
 classifier = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global classifier
+    try:
+        # device='cuda' would be used in production if available
+        classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb", savedir="tmpdir")
+        print("SpeechBrain models loaded successfully")
+    except Exception as e:
+        print(f"Warning: Could not load SpeechBrain model: {e}")
+    yield
+    # Clean up can happen here if needed
+
+app = FastAPI(title="SonicBridge VAD & Speaker Verification Service", lifespan=lifespan)
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "model": "speechbrain/spkrec-ecapa-voxceleb"}
 
-@app.on_event("startup")
-async def startup_event():
-    global classifier
-    try:
-        # device='cuda' would be used in production
-        classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb", savedir="tmpdir")
-        print("SpeechBrain models loaded successfully")
-    except Exception as e:
-        print(f"Warning: Could not load SpeechBrain model: {e}")
+@app.get("/")
+async def root():
+    return {"message": "SonicBridge AI Service is Running"}
 
 class EmbeddingResponse(BaseModel):
     embedding: list

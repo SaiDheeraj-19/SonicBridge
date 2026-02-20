@@ -1,9 +1,13 @@
-fastapi==0.103.2
-uvicorn==0.23.2
-numpy==1.25.2
-torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
-torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
-speechbrain==0.5.15
-python-multipart==0.0.6
+fastapi
+uvicorn
+numpy
+torch --index-url https://download.pytorch.org/whl/cpu
+torchaudio --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
+speechbrain
+python-multipart
 hyperpyyaml
 ruamel.yaml
+requests
+scipy
+huggingface_hub==0.23.5
