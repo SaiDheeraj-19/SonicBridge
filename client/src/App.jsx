@@ -30,6 +30,8 @@ function App() {
   const [roomCode, setRoomCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
 
+  const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
+
   // Handle active theme class on body
   useEffect(() => {
     if (isDarkMode) {
@@ -38,6 +40,23 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Handle host left automated teardown
+  useEffect(() => {
+    let timer;
+    if (hostLeftCountdown !== null && hostLeftCountdown > 0) {
+      timer = setTimeout(() => {
+        setHostLeftCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (hostLeftCountdown === 0) {
+      // Countdown finished
+      setCurrentView('portal');
+      setRoomCode('');
+      setJoinCode('');
+      setHostLeftCountdown(null);
+    }
+    return () => clearTimeout(timer);
+  }, [hostLeftCountdown]);
 
   const processAudioQueue = useCallback(async () => {
     if (audioQueueRef.current.length === 0) {
@@ -94,6 +113,8 @@ function App() {
           setCurrentView('portal');
           setRoomCode('');
           setJoinCode('');
+        } else if (msg.type === 'hostLeft') {
+          setHostLeftCountdown(15);
         }
       } catch (e) {
         console.error('Error parsing WS message:', e);
@@ -354,7 +375,11 @@ function App() {
         <div className="flex items-center gap-4 md:gap-10">
           <button className="small-caps text-[10px] opacity-60 hover:opacity-100 transition-opacity">MICROPHONE</button>
           <div className="h-4 w-px bg-charcoal/10 dark:bg-white/10 hidden md:block"></div>
-          <button onClick={() => { if (isRecording) handleToggleRecording(); setCurrentView('portal'); }} className="small-caps text-[11px] opacity-30 hover:opacity-100 hover:text-red-500 transition-all">
+          <button onClick={() => {
+            if (isRecording) handleToggleRecording();
+            sendMessage(JSON.stringify({ type: 'closeRoom' }));
+            setCurrentView('portal');
+          }} className="small-caps text-[11px] opacity-30 hover:opacity-100 hover:text-red-500 transition-all">
             TERMINATE
           </button>
         </div>
@@ -443,6 +468,24 @@ function App() {
       <div className="fixed top-0 left-0 w-full h-[2px] bg-primary-green/20 overflow-hidden z-20 pointer-events-none">
         <div className="h-full bg-primary-green w-1/3 shadow-[0_0_10px_#13ec13] animate-[pulse_2s_infinite]"></div>
       </div>
+
+      {hostLeftCountdown !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md transition-all duration-300">
+          <div className="bg-paper-white dark:bg-[#0a0a0a] p-10 rounded-[32px] max-w-sm w-full text-center shadow-2xl border border-charcoal/10 dark:border-white/10 mx-4">
+            <span className="material-symbols-outlined text-[40px] text-red-500 mb-6 drop-shadow-[0_0_12px_rgba(239,68,68,0.4)]">warning</span>
+            <h3 className="text-xl font-bold tracking-tight text-charcoal dark:text-white mb-3">Host Terminated Session</h3>
+            <p className="text-sm text-charcoal/60 dark:text-slate-400 mb-8 font-medium leading-relaxed">
+              This room will automatically close in <span className="text-red-500 font-bold px-1 text-lg">{hostLeftCountdown}</span> seconds
+            </p>
+            <button
+              onClick={() => { setHostLeftCountdown(null); setCurrentView('portal'); setRoomCode(''); setJoinCode(''); }}
+              className="btn-outline w-full text-xs"
+            >
+              LEAVE NOW
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 

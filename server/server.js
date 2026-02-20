@@ -151,6 +151,22 @@ wss.on('connection', (ws) => {
                         }
                     }
                 }
+                else if (data.type === 'closeRoom') {
+                    if (isHost && currentRoomId && rooms.has(currentRoomId)) {
+                        const room = rooms.get(currentRoomId);
+                        room.users.forEach(u => {
+                            if (u.ws.readyState === 1) {
+                                u.ws.send(JSON.stringify({ type: 'hostLeft' }));
+                            }
+                        });
+
+                        if (room.sarvamWs) room.sarvamWs.close();
+                        rooms.delete(currentRoomId);
+                        currentRoomId = null;
+                        isHost = false;
+                        console.log('Room closed explicitly by host.');
+                    }
+                }
             } catch (e) {
                 console.error("Error processing control message:", e);
             }
@@ -203,8 +219,7 @@ wss.on('connection', (ws) => {
                 // Host left, clean up
                 room.users.forEach(u => {
                     if (u.ws.readyState === 1) {
-                        u.ws.send(JSON.stringify({ type: 'error', message: 'Room closed by host.' }));
-                        u.ws.close();
+                        u.ws.send(JSON.stringify({ type: 'hostLeft' }));
                     }
                 });
 
