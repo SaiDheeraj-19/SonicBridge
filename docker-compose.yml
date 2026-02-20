@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  sonicbridge-backend:
+    build: ./server
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+      - SPEECHBRAIN_URL=http://speechbrain-service:8000
+    depends_on:
+      - speechbrain-service
+      - redis
+
+  speechbrain-service:
+    build: ./server/speechbrain_service
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"

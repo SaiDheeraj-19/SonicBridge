@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import sarvamService from './services/sarvamService.js';
+import voiceIsolationService from './services/voiceIsolationService.js';
 
 dotenv.config();
 
@@ -24,6 +25,10 @@ class Room {
         this.hostWs = hostWs;
         this.users = []; // Array of { ws, language }
         this.sarvamWs = null;
+        this.hostEmbedding = null; // Stored SpeechBrain embedding for Layer 4 Voice Locking
+        this.enrollmentBuffer = [];
+        this.enrollmentLength = 0;
+        this.isEnrolling = false;
     }
 }
 
@@ -109,8 +114,8 @@ wss.on('connection', (ws) => {
                                 // Find unique languages requested in the room
                                 const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
 
-                                // Optimization: Process each language ONCE
-                                for (const targetLanguage of uniqueLanguages) {
+                                // Optimization: Process each language parallelly
+                                await Promise.all(uniqueLanguages.map(async (targetLanguage) => {
                                     try {
                                         // 1. Translate
                                         const translatedText = await sarvamService.translateText(text, targetLanguage);
@@ -130,11 +135,11 @@ wss.on('connection', (ws) => {
                                         // Fallback logic
                                         room.users.forEach(user => {
                                             if (user.language === targetLanguage && user.ws.readyState === 1) {
-                                                user.ws.send(JSON.stringify({ type: 'translation', text: text })); // Send original english text
+                                                user.ws.send(JSON.stringify({ type: 'translation', text: text })); // Send original text
                                             }
                                         });
                                     }
-                                }
+                                }));
                             }
                         },
                         (error) => {
@@ -185,8 +190,41 @@ wss.on('connection', (ws) => {
             }
 
             const room = rooms.get(currentRoomId);
+
+            // LAYER 3: Voice Activity Detection (Ignore silence chunks to save Sarvam Server Quota)
+            const hasVoice = voiceIsolationService.checkVoiceActivity(message);
+            if (!hasVoice) return; // Drop chunk silently
+
             if (room.sarvamWs && room.sarvamWs.readyState === 1) {
-                const dataLength = message.length;
+                // LAYER 2: RNNoise Suppression
+                const cleanBuffer = await voiceIsolationService.applyRNNoise(message);
+
+                if (!room.hostEmbedding) {
+                    // Accumulate 5 seconds of audio for Voice Enrollment (5s * 32KB/s = 160000 bytes)
+                    room.enrollmentBuffer.push(cleanBuffer);
+                    room.enrollmentLength += cleanBuffer.length;
+
+                    if (room.enrollmentLength >= 160000 && !room.isEnrolling) {
+                        room.isEnrolling = true;
+                        const fullEnrollmentBuf = Buffer.concat(room.enrollmentBuffer);
+                        console.log(`[SpeechBrain] Initiating Host embedding enrollment for ${currentRoomId}`);
+
+                        voiceIsolationService.enrollHostVoice(fullEnrollmentBuf).then(emb => {
+                            if (emb) room.hostEmbedding = emb;
+                            console.log(`[SpeechBrain] Host embedding generated and locked under Room ${currentRoomId}`);
+                        });
+                    }
+                } else {
+                    // LAYER 4: Verify Speaker (Throws/Drops if intruder bypasses websocket bounds)
+                    const isSpeakerMatch = await voiceIsolationService.verifySpeaker(cleanBuffer, room.hostEmbedding);
+                    if (!isSpeakerMatch) {
+                        console.warn(`[SpeechBrain] Discarded non-host voice segment in room ${currentRoomId}`);
+                        // Notify host or logs
+                        return;
+                    }
+                }
+
+                const dataLength = cleanBuffer.length;
                 const buffer = Buffer.alloc(44);
                 buffer.write('RIFF', 0);
                 buffer.writeUInt32LE(dataLength + 36, 4);
@@ -202,7 +240,7 @@ wss.on('connection', (ws) => {
                 buffer.write('data', 36);
                 buffer.writeUInt32LE(dataLength, 40);
 
-                const wavBuffer = Buffer.concat([buffer, message]);
+                const wavBuffer = Buffer.concat([buffer, cleanBuffer]);
 
                 room.sarvamWs.send(JSON.stringify({
                     audio: {
