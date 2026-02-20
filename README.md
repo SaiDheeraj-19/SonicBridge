@@ -6,8 +6,9 @@
 - **Real-time Streaming**: End-to-end latency < 1.5s using WebSockets and AudioWorklet.
 - **Premium UI**: Sleek dark mode design with electric blue accents and micro-animations.
 - **Native Noise Suppression**: Leverages browser WebRTC APIs for high-quality audio capture.
-- **Multi-language Support**: Supports 10+ Indian languages and English.
+- **Voice Isolation**: 4-layer architecture including Neural Noise Suppression and Speaker Verification.
 - **Instant Playback**: Decodes and plays audio chunks as they arrive.
+- **Secure Sessions**: Host-locking voice embeddings ensure only the host is translated.
 
 ---
 
@@ -21,12 +22,17 @@
 - **Framer Motion**: Smooth UI transitions and animations.
 
 ### Backend
-- **Node.js & Express**: Scalable backend architecture.
-- **WebSocket (ws)**: Persistent connections for low-latency streaming.
+- **Node.js & Express**: Scalable coordination backend.
+- **Python (FastAPI)**: AI Microservice for SpeechBrain voice locking.
 - **Sarvam AI APIs**:
-  - **Streaming Saaras v3**: Real-time ASR with translation.
-  - **Bulbul v1**: High-quality Indian language Text-to-Speech.
-- **Structured Logging**: Performance and error tracking.
+  - **Saaras v2.5 (Streaming)**: Real-time ASR.
+  - **Mayura v1**: Specialized translation.
+  - **Bulbul v3**: Premium neural TTS.
+- **Voice Isolation Layers**:
+  1. Browser WebRTC Constraints
+  2. Server RNNoise Filtering
+  3. WebRTC Voice Activity Detection (VAD)
+  4. Speaker Embedding Verification (SpeechBrain)
 
 ---
 
@@ -34,30 +40,44 @@
 
 ### Prerequisites
 - Node.js (v18+)
+- Python 3.10+ (For SpeechBrain service)
 - Sarvam AI API Key (Get it from [sarvam.ai](https://www.sarvam.ai/))
 
-### 1. Clone & Configure
+### Option 1: Docker (Fastest)
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd SonicBridge
+docker-compose up -d --build
+```
 
-# Backend Setup
+### Option 2: Manual Setup
+
+#### 1. AI Microservice (Python)
+```bash
+cd server/speechbrain_service
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+#### 2. Backend (Node.js)
+```bash
 cd server
-npm install
-cp .env.example .env # Add your SARVAM_API_KEY
-npm run dev
-
-# Frontend Setup
-cd ../client
 npm install
 npm run dev
 ```
 
-### 2. Environment Variables
+#### 3. Frontend (React)
+```bash
+cd client
+npm install
+npm run dev
+```
+
+### Environment Variables
 Create a `.env` file in the `server` directory:
 ```env
 SARVAM_API_KEY=your_key_here
+SPEECHBRAIN_URL=http://localhost:8000
 PORT=5000
 ```
 

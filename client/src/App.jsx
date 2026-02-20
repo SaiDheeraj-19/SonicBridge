@@ -217,9 +217,8 @@ function App() {
       </div>
 
       <footer className="flex w-full items-center justify-center gap-8 md:gap-16 z-10 flex-wrap">
-        <a href="https://docs.sarvam.ai/api-reference-docs/getting-started/quickstart" target="_blank" rel="noopener noreferrer" className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">DOCUMENTATION</a>
-        <button onClick={() => alert('About SonicBridge: Real-time translation powered by Sarvam AI.')} className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">ABOUT</button>
-        <button onClick={() => alert('Legal: All rights reserved.')} className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">LEGAL</button>
+        <button onClick={() => setCurrentView('about')} className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">ABOUT</button>
+        <button onClick={() => setCurrentView('legal')} className="text-[10px] md:text-xs font-medium tracking-[0.2em] text-charcoal/40 dark:text-slate-500 hover:text-primary transition-colors duration-300">LEGAL</button>
       </footer>
 
       <div className="fixed top-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
@@ -515,12 +514,70 @@ function App() {
     </div>
   );
 
+  // --- About View ---
+  const renderAbout = () => (
+    <div className="relative flex flex-col items-center justify-center min-h-screen w-full py-16 px-8 bg-paper-white dark:bg-[#0a0a0a] text-charcoal dark:text-slate-100 transition-colors">
+      <header className="absolute top-12 w-full flex justify-between px-12 max-w-6xl mx-auto">
+        <button onClick={() => setCurrentView('welcome')} className="material-symbols-outlined text-charcoal/40 dark:text-white/40 hover:opacity-100 transition-opacity">arrow_back</button>
+        <div className="dot-matrix text-[10px] tracking-[0.8em] text-[#1A1A1A]/60 dark:text-white/60 select-none mr-[-0.8em]">ABOUT</div>
+        <div className="w-6"></div>
+      </header>
+      <main className="max-w-2xl text-center space-y-8 animate-fade-in">
+        <h1 className="text-4xl font-bold tracking-tight">SonicBridge</h1>
+        <p className="text-lg text-charcoal/60 dark:text-slate-400 font-light leading-relaxed">
+          SonicBridge is a high-performance, real-time audio translation platform designed to eliminate language barriers in live environments.
+          By combining browser-side WebRTC noise suppression with server-side neural filtering and speaker verification, we ensure that translation is both accurate and secure.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8 text-left">
+          <div className="p-6 rounded-2xl border border-charcoal/5 dark:border-white/5 bg-charcoal/[0.02] dark:bg-white/[0.02]">
+            <h3 className="text-sm font-bold mb-2">Voice Isolation</h3>
+            <p className="text-xs text-charcoal/40 dark:text-slate-500">4-layer pipeline removing background noise and background voices.</p>
+          </div>
+          <div className="p-6 rounded-2xl border border-charcoal/5 dark:border-white/5 bg-charcoal/[0.02] dark:bg-white/[0.02]">
+            <h3 className="text-sm font-bold mb-2">Live AI Sync</h3>
+            <p className="text-xs text-charcoal/40 dark:text-slate-500">Sub-second latency powered by Sarvam AI's localized language models.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+
+  // --- Legal View ---
+  const renderLegal = () => (
+    <div className="relative flex flex-col items-center justify-center min-h-screen w-full py-16 px-8 bg-paper-white dark:bg-[#0a0a0a] text-charcoal dark:text-slate-100 transition-colors">
+      <header className="absolute top-12 w-full flex justify-between px-12 max-w-6xl mx-auto">
+        <button onClick={() => setCurrentView('welcome')} className="material-symbols-outlined text-charcoal/40 dark:text-white/40 hover:opacity-100 transition-opacity">arrow_back</button>
+        <div className="dot-matrix text-[10px] tracking-[0.8em] text-[#1A1A1A]/60 dark:text-white/60 select-none mr-[-0.8em]">LEGAL</div>
+        <div className="w-6"></div>
+      </header>
+      <main className="max-w-2xl text-left space-y-12 animate-fade-in">
+        <section>
+          <h2 className="text-xs font-bold tracking-[0.2em] mb-4 uppercase opacity-40">Privacy Policy</h2>
+          <p className="text-sm text-charcoal/60 dark:text-slate-400 leading-relaxed italic">
+            "Your privacy is prioritized. Audio data is processed in real-time and is NOT stored on our servers after the session expires. Speech embeddings are transient and tied only to the active room session."
+          </p>
+        </section>
+        <section>
+          <h2 className="text-xs font-bold tracking-[0.2em] mb-4 uppercase opacity-40">Terms of Service</h2>
+          <p className="text-sm text-charcoal/60 dark:text-slate-400 leading-relaxed">
+            By using SonicBridge, you agree to the responsible use of AI translation. This service is provided "as is" with high-reliability targets for educational and corporate bridging.
+          </p>
+        </section>
+        <section className="pt-8 border-t border-charcoal/5 dark:border-white/5">
+          <p className="text-[10px] opacity-20 tracking-widest uppercase">© 2026 SonicBridge Systems. v1.0.42_S</p>
+        </section>
+      </main>
+    </div>
+  );
+
   return (
     <>
       {currentView === 'welcome' && renderWelcome()}
       {currentView === 'portal' && renderPortal()}
       {currentView === 'host' && renderHost()}
       {currentView === 'participant' && renderParticipant()}
+      {currentView === 'about' && renderAbout()}
+      {currentView === 'legal' && renderLegal()}
     </>
   );
 }
