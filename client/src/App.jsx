@@ -392,6 +392,12 @@ function App() {
     <div className="participant-bg text-charcoal dark:text-slate-100 min-h-screen flex flex-col w-full relative transition-colors duration-500">
       <header className="glass-header sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('portal')}>
+            <div className="w-8 h-8 flex items-center justify-center border border-black/10 dark:border-white/20 rounded-lg">
+              <span className="material-symbols-outlined text-black dark:text-primary-green text-xl">waves</span>
+            </div>
+            <span className="text-lg font-bold tracking-tight hidden sm:block">SonicBridge</span>
+          </div>
           <div className="h-4 w-[1px] bg-black/10 dark:bg-white/20 hidden md:block"></div>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
             <span className="relative flex h-2 w-2">
@@ -426,7 +432,7 @@ function App() {
       <main className="flex-1 flex flex-col items-center justify-center px-6 relative">
         <div className="absolute top-6 left-1/2 -translate-x-1/2 text-center opacity-40 z-10 w-full px-4 sm:px-0">
           <p className="text-[10px] uppercase tracking-[0.4em] mb-1">Live Session</p>
-          <h2 className="text-sm font-light">Global Leadership Summit 2024 • {roomCode}</h2>
+          <h2 className="text-sm font-light uppercase tracking-widest">{roomCode}</h2>
         </div>
 
         <div className="w-full max-w-4xl h-[60vh] flex flex-col justify-end gap-12 custom-scrollbar overflow-y-auto pb-24 z-10 mx-auto px-4 mt-16 transcript-container">
