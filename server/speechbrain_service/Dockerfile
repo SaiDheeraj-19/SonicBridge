@@ -8,11 +8,21 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# Use a non-root user as recommended by Hugging Face
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR $HOME/app
 
-COPY . .
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+COPY --chown=user . .
+
+# Ensure model directory is writable
+RUN mkdir -p $HOME/app/tmpdir && chmod 777 $HOME/app/tmpdir
 
 EXPOSE 7860
 
