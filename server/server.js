@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import sarvamService from './services/sarvamService.js';
 
 dotenv.config();
@@ -40,12 +41,16 @@ wss.on('connection', (ws) => {
                 const data = JSON.parse(message.toString());
 
                 if (data.type === 'createRoom') {
-                    const roomId = data.roomId;
-                    if (!rooms.has(roomId)) {
-                        rooms.set(roomId, new Room(roomId, ws));
-                    } else {
-                        rooms.get(roomId).hostWs = ws; // Override if reconnecting
+                    // Start of new host session
+                    if (isHost && currentRoomId && rooms.has(currentRoomId)) {
+                        const oldRoom = rooms.get(currentRoomId);
+                        if (oldRoom.sarvamWs) oldRoom.sarvamWs.close();
+                        rooms.delete(currentRoomId);
                     }
+
+                    const roomId = crypto.randomUUID().slice(0, 8).toUpperCase();
+                    rooms.set(roomId, new Room(roomId, ws));
+
                     currentRoomId = roomId;
                     isHost = true;
                     console.log(`Room created: ${roomId}`);
@@ -57,8 +62,14 @@ wss.on('connection', (ws) => {
                         const room = rooms.get(roomId);
                         room.users.push({ ws, language: data.targetLang });
                         currentRoomId = roomId;
+                        isHost = false;
                         console.log(`User joined room ${roomId} with language ${data.targetLang}`);
                         ws.send(JSON.stringify({ type: 'joined', roomId }));
+
+                        // Notify host of new join
+                        if (room.hostWs && room.hostWs.readyState === 1) {
+                            room.hostWs.send(JSON.stringify({ type: 'userJoined', activeUsers: room.users.length }));
+                        }
                     } else {
                         ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
                     }
@@ -147,7 +158,13 @@ wss.on('connection', (ws) => {
         }
 
         // Handle binary audio data
-        if (isBinary && isHost && currentRoomId && rooms.has(currentRoomId)) {
+        if (isBinary) {
+            if (!isHost || !currentRoomId || !rooms.has(currentRoomId)) {
+                // Reject unauthorized audio injection from users
+                console.warn('Unauthorized audio chunk rejected from non-host client.');
+                return;
+            }
+
             const room = rooms.get(currentRoomId);
             if (room.sarvamWs && room.sarvamWs.readyState === 1) {
                 const dataLength = message.length;
@@ -182,8 +199,15 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         if (currentRoomId && rooms.has(currentRoomId)) {
             const room = rooms.get(currentRoomId);
-            if (isHost) {
+            if (isHost && room.hostWs === ws) {
                 // Host left, clean up
+                room.users.forEach(u => {
+                    if (u.ws.readyState === 1) {
+                        u.ws.send(JSON.stringify({ type: 'error', message: 'Room closed by host.' }));
+                        u.ws.close();
+                    }
+                });
+
                 if (room.sarvamWs) room.sarvamWs.close();
                 rooms.delete(currentRoomId);
                 console.log(`Room ${currentRoomId} deleted as host left.`);
@@ -191,6 +215,11 @@ wss.on('connection', (ws) => {
                 // User left
                 room.users = room.users.filter(u => u.ws !== ws);
                 console.log(`User left room ${currentRoomId}. ${room.users.length} remaining.`);
+
+                // Notify host user left
+                if (room.hostWs && room.hostWs.readyState === 1) {
+                    room.hostWs.send(JSON.stringify({ type: 'userLeft', activeUsers: room.users.length }));
+                }
             }
         }
         console.log('Client disconnected');

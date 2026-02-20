@@ -83,6 +83,17 @@ function App() {
           setTranscript(prev => prev + ' ' + msg.text);
         } else if (msg.type === 'translation') {
           setTranslatedText(prev => prev + ' ' + msg.text);
+        } else if (msg.type === 'roomCreated') {
+          setRoomCode(msg.roomId);
+          setCurrentView('host');
+        } else if (msg.type === 'joined') {
+          setRoomCode(msg.roomId);
+          setCurrentView('participant');
+        } else if (msg.type === 'error') {
+          alert('SonicBridge System: ' + msg.message);
+          setCurrentView('portal');
+          setRoomCode('');
+          setJoinCode('');
         }
       } catch (e) {
         console.error('Error parsing WS message:', e);
@@ -187,10 +198,7 @@ function App() {
         {/* Create Room */}
         <div
           onClick={() => {
-            const newCode = `SB-${Math.floor(1000 + Math.random() * 9000)}`;
-            setRoomCode(newCode);
-            sendMessage(JSON.stringify({ type: 'createRoom', roomId: newCode }));
-            setCurrentView('host');
+            sendMessage(JSON.stringify({ type: 'createRoom' }));
           }}
           className="premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group"
         >
@@ -218,9 +226,7 @@ function App() {
               onClick={() => {
                 if (joinCode) {
                   const upperCode = joinCode.toUpperCase();
-                  setRoomCode(upperCode);
                   sendMessage(JSON.stringify({ type: 'joinRoom', roomId: upperCode, targetLang }));
-                  setCurrentView('participant');
                 }
               }}
               className="btn-outline w-full max-w-[200px]"
