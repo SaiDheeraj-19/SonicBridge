@@ -167,6 +167,9 @@ wss.on('connection', (ws) => {
                         console.log('Room closed explicitly by host.');
                     }
                 }
+                else if (data.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong', timestamp: data.timestamp }));
+                }
             } catch (e) {
                 console.error("Error processing control message:", e);
             }

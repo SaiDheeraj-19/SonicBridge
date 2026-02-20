@@ -27,6 +27,9 @@ function App() {
   const isPlayingRef = useRef(false);
   const processQueueRef = useRef(null);
 
+  const [hostListeners, setHostListeners] = useState(0);
+  const [hostLatency, setHostLatency] = useState(0);
+
   const [roomCode, setRoomCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
 
@@ -57,6 +60,8 @@ function App() {
     }
     return () => clearTimeout(timer);
   }, [hostLeftCountdown]);
+
+
 
   const processAudioQueue = useCallback(async () => {
     if (audioQueueRef.current.length === 0) {
@@ -113,8 +118,13 @@ function App() {
           setCurrentView('portal');
           setRoomCode('');
           setJoinCode('');
+          setHostListeners(0);
         } else if (msg.type === 'hostLeft') {
           setHostLeftCountdown(15);
+        } else if (msg.type === 'userJoined' || msg.type === 'userLeft') {
+          setHostListeners(msg.activeUsers || 0);
+        } else if (msg.type === 'pong') {
+          setHostLatency(Date.now() - msg.timestamp);
         }
       } catch (e) {
         console.error('Error parsing WS message:', e);
@@ -126,6 +136,17 @@ function App() {
   }, [playAudioBuffer]);
 
   const { isConnected, sendMessage } = useWebSocket('ws://localhost:5001', onWebSocketMessage);
+
+  // Host ping interval for real-time latency calculate
+  useEffect(() => {
+    let pingInterval;
+    if (currentView === 'host' && isConnected) {
+      pingInterval = setInterval(() => {
+        sendMessage(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+      }, 2000);
+    }
+    return () => clearInterval(pingInterval);
+  }, [currentView, isConnected, sendMessage]);
 
   useEffect(() => {
     if (currentView === 'participant' && roomCode) {
@@ -365,11 +386,11 @@ function App() {
         <div className="flex gap-8 md:gap-12 flex-wrap">
           <div className="flex flex-col gap-1">
             <span className="small-caps text-[9px] opacity-30">LATENCY</span>
-            <span className="text-[11px] font-mono opacity-80">14MS</span>
+            <span className="text-[11px] font-mono opacity-80">{hostLatency}MS</span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="small-caps text-[9px] opacity-30">LISTENERS</span>
-            <span className="text-[11px] font-mono opacity-80">2</span>
+            <span className="text-[11px] font-mono opacity-80">{hostListeners}</span>
           </div>
         </div>
         <div className="flex items-center gap-4 md:gap-10">
