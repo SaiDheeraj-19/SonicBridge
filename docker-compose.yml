@@ -1,9 +1,18 @@
 version: "3.8"
 services:
+  sonicbridge-client:
+    build:
+      context: ./client
+      args:
+        - VITE_WS_URL=ws://localhost:5001
+    ports:
+      - "80:80"
+    depends_on:
+      - sonicbridge-backend
+
   sonicbridge-backend:
     build: ./server
     ports:
-      - "5000:5000"
       - "5001:5001"
     environment:
       - SARVAM_API_KEY=${SARVAM_API_KEY}
@@ -16,13 +25,6 @@ services:
     build: ./server/speechbrain_service
     ports:
       - "8000:8000"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   redis:
     image: "redis:alpine"

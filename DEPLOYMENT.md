@@ -3,7 +3,7 @@
 ## Architecture Overview
 SonicBridge is a high-performance, real-time translation system utilizing a multi-layered voice isolation pipeline.
 
-- **Frontend:** React (Vite) + Tailwind CSS (Browser-side WebRTC noise suppression).
+- **Frontend:** React (Vite) + Tailwind CSS (Served via Nginx in Docker).
 - **Primary Backend:** Node.js (Express) + WebSocket (Coordination, Sarvam API integration).
 - **AI Microservice:** Python (FastAPI) + SpeechBrain (Speaker Verification & Enrollment).
 - **Isolation Layers:** WebRTC constraints → RNNoise → VAD → SpeechBrain.
@@ -15,9 +15,9 @@ SonicBridge is a high-performance, real-time translation system utilizing a mult
 ### 1. API Keys
 Create a `.env` file in the `server/` directory:
 ```env
-PORT=5000
+PORT=5001
 SARVAM_API_KEY=your_key_here
-SPEECHBRAIN_URL=http://localhost:8000
+SPEECHBRAIN_URL=http://speechbrain-service:8000
 ```
 
 ### 2. Infrastructure Requirements
@@ -37,9 +37,20 @@ docker-compose up -d --build
 ```
 
 This will spin up:
-1. **SonicBridge Backend:** Node.js server.
-2. **SpeechBrain Service:** Python embedding worker.
-3. **Redis:** For state persistence across clusters.
+1. **SonicBridge Client:** React Frontend on Port 80.
+2. **SonicBridge Backend:** Node.js server on Port 5001.
+3. **SpeechBrain Service:** Python embedding worker on Port 8000.
+4. **Redis:** For state persistence across clusters.
+
+---
+
+## 🌐 Cloud Deployment (VPS Example)
+
+1. **Provision a VPS:** DigitalOcean Droplet, AWS EC2, or Railway.
+2. **Install Utilities:** Docker & Docker Compose.
+3. **Clone the repo.**
+4. **Environment:** Set `SARVAM_API_KEY` in your CI/CD or `.env`.
+5. **SSL (REQUIRED):** Modern browsers block microphone access on `http`. You MUST deploy on `https` (using Certbot + Nginx).
 
 ---
 
@@ -50,7 +61,7 @@ Browsers block `getUserMedia` on non-HTTPS origins.
 Use NGINX as a reverse proxy with Let's Encrypt:
 ```nginx
 location /ws {
-    proxy_pass http://localhost:5000;
+    proxy_pass http://localhost:5001;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "Upgrade";

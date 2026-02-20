@@ -135,7 +135,8 @@ function App() {
     }
   }, [playAudioBuffer]);
 
-  const { isConnected, sendMessage } = useWebSocket('ws://localhost:5001', onWebSocketMessage);
+  const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:5001`;
+  const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
 
   // Host ping interval for real-time latency calculate
   useEffect(() => {
