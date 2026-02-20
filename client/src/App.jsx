@@ -52,11 +52,14 @@ function App() {
         setHostLeftCountdown(prev => prev - 1);
       }, 1000);
     } else if (hostLeftCountdown === 0) {
-      // Countdown finished
-      setCurrentView('portal');
-      setRoomCode('');
-      setJoinCode('');
-      setHostLeftCountdown(null);
+      // Countdown finished - Reset room state
+      const resetRoom = () => {
+        setRoomCode('');
+        setJoinCode('');
+        setHostLeftCountdown(null);
+        setCurrentView('portal');
+      };
+      resetRoom();
     }
     return () => clearTimeout(timer);
   }, [hostLeftCountdown]);
