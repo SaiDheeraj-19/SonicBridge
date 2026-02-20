@@ -33,12 +33,12 @@ function App() {
 
   // Handle active theme class on body
   useEffect(() => {
-    if (isDarkMode || currentView === 'participant') { // Participant view is strictly dark
+    if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode, currentView]);
+  }, [isDarkMode]);
 
   const processAudioQueue = useCallback(async () => {
     if (audioQueueRef.current.length === 0) {
@@ -350,36 +350,41 @@ function App() {
 
   // --- Participant View ---
   const renderParticipant = () => (
-    <div className="participant-bg text-slate-100 min-h-screen flex flex-col w-full relative">
+    <div className="participant-bg text-charcoal dark:text-slate-100 min-h-screen flex flex-col w-full relative transition-colors duration-500">
       <header className="glass-header sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('portal')}>
-            <div className="w-8 h-8 flex items-center justify-center border border-white/20 rounded-lg">
-              <span className="material-symbols-outlined text-primary-green text-xl">waves</span>
+            <div className="w-8 h-8 flex items-center justify-center border border-black/10 dark:border-white/20 rounded-lg">
+              <span className="material-symbols-outlined text-black dark:text-primary-green text-xl">waves</span>
             </div>
             <span className="text-lg font-bold tracking-tight hidden sm:block">SonicBridge</span>
           </div>
-          <div className="h-4 w-[1px] bg-white/20 hidden md:block"></div>
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
+          <div className="h-4 w-[1px] bg-black/10 dark:bg-white/20 hidden md:block"></div>
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
             <span className="relative flex h-2 w-2">
               <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${isConnected ? 'bg-primary-green animate-ping' : 'bg-red-500'}`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-primary-green' : 'bg-red-500'}`}></span>
             </span>
-            <span className="text-[11px] font-medium uppercase tracking-widest text-slate-400">{isConnected ? 'Connected' : 'Offline'}</span>
+            <span className="text-[11px] font-medium uppercase tracking-widest text-black/40 dark:text-slate-400">{isConnected ? 'Connected' : 'Offline'}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="relative group hidden sm:block">
-            <label className="absolute -top-2 left-3 px-1 bg-black text-[10px] text-slate-500 uppercase tracking-tighter">Target Language</label>
-            <div className="flex items-center border border-white/20 rounded-lg px-2 hover:border-white/40 transition-colors cursor-pointer bg-black/40">
-              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-sm font-medium w-full py-2 bg-transparent text-white outline-none appearance-none cursor-pointer">
-                {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-black text-white">{l.name}</option>)}
+            <label className="absolute -top-2 left-3 px-1 bg-white dark:bg-black text-[10px] text-black/40 dark:text-slate-500 uppercase tracking-tighter">Target Language</label>
+            <div className="flex items-center border border-black/10 dark:border-white/20 rounded-lg px-2 hover:border-black/30 dark:hover:border-white/40 transition-colors cursor-pointer bg-white/40 dark:bg-black/40">
+              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-sm font-medium w-full py-2 bg-transparent text-black dark:text-white outline-none appearance-none cursor-pointer">
+                {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-white text-black dark:bg-black dark:text-white">{l.name}</option>)}
               </select>
-              <span className="material-symbols-outlined text-slate-400 text-lg pointer-events-none">expand_more</span>
             </div>
           </div>
-          <button onClick={() => setCurrentView('portal')} className="w-10 h-10 rounded-full flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors">
+
+          {/* Theme Toggle mapped for Participant */}
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-10 h-10 rounded-full flex items-center justify-center border border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            <span className="material-symbols-outlined text-xl text-black/60 dark:text-white/60">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
+          </button>
+
+          <button onClick={() => setCurrentView('portal')} className="w-10 h-10 rounded-full flex items-center justify-center border border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
@@ -391,36 +396,36 @@ function App() {
           <h2 className="text-sm font-light">Global Leadership Summit 2024 • {roomCode}</h2>
         </div>
 
-        <div className="w-full max-w-4xl h-[60vh] flex flex-col justify-end gap-12 custom-scrollbar overflow-y-auto pb-24 z-10 mx-auto px-4 mt-16">
-          <div className="text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-white transition-opacity duration-300">
+        <div className="w-full max-w-4xl h-[60vh] flex flex-col justify-end gap-12 custom-scrollbar overflow-y-auto pb-24 z-10 mx-auto px-4 mt-16 transcript-container">
+          <div className="text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
             {translatedText ? translatedText : <span className="opacity-40 italic font-light text-2xl md:text-4xl text-center">Waiting for host audio...</span>}
           </div>
         </div>
 
         <div className="absolute bottom-12 w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center sm:items-end px-6 sm:px-10 gap-6 sm:gap-0">
           <div className="flex flex-col gap-1 items-center sm:items-start text-center sm:text-left hidden md:flex">
-            <span className="dot-matrix text-[10px] text-slate-500">Signal Strength</span>
+            <span className="dot-matrix text-[10px] text-black/40 dark:text-slate-500">Signal Strength</span>
             <div className="flex gap-1 justify-center sm:justify-start">
               <div className="w-1 h-3 bg-primary-green"></div>
               <div className="w-1 h-3 bg-primary-green"></div>
               <div className="w-1 h-3 bg-primary-green"></div>
-              <div className="w-1 h-3 bg-white/20"></div>
+              <div className="w-1 h-3 bg-black/10 dark:bg-white/20"></div>
             </div>
           </div>
 
           <div className="text-center sm:text-right hidden sm:block">
-            <p className="dot-matrix text-[10px] text-slate-500 mb-1">Host Broadcast</p>
+            <p className="dot-matrix text-[10px] text-black/40 dark:text-slate-500 mb-1">Host Broadcast</p>
             <div className="flex items-center justify-center sm:justify-end gap-2">
               <span className="material-symbols-outlined text-sm text-primary-green">mic</span>
-              <span className="text-xs font-medium tracking-widest uppercase">Live Sync</span>
+              <span className="text-xs font-medium tracking-widest uppercase text-charcoal dark:text-white">Live Sync</span>
             </div>
           </div>
 
           <div className="sm:hidden block w-full relative">
-            <label className="block px-1 text-[10px] text-slate-500 uppercase tracking-tighter mb-1 text-center">Target Language</label>
-            <div className="flex mx-auto max-w-[200px] items-center border border-white/20 rounded-lg px-2 transition-colors cursor-pointer bg-black/40">
-              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-xs font-medium w-full py-2 bg-transparent text-white outline-none cursor-pointer text-center">
-                {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-black text-white">{l.name}</option>)}
+            <label className="block px-1 text-[10px] text-black/40 dark:text-slate-500 uppercase tracking-tighter mb-1 text-center">Target Language</label>
+            <div className="flex mx-auto max-w-[200px] items-center border border-black/10 dark:border-white/20 rounded-lg px-2 transition-colors cursor-pointer bg-white/40 dark:bg-black/40">
+              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-xs font-medium w-full py-2 bg-transparent text-charcoal dark:text-white outline-none cursor-pointer text-center">
+                {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-white text-black dark:bg-black dark:text-white">{l.name}</option>)}
               </select>
             </div>
           </div>
