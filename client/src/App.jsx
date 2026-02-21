@@ -35,6 +35,7 @@ function App() {
 
   const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [audioDebug, setAudioDebug] = useState({ received: 0, played: 0, errors: 0, lastError: '' });
 
   // Handle active theme class on body
   useEffect(() => {
@@ -80,6 +81,7 @@ function App() {
     try {
       if (!window.sharedAudioContext) {
         window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('[Audio] Created AudioContext in processQueue');
       }
 
       // WebSocket returns binary messages as Blob. AudioContext requires ArrayBuffer.
@@ -95,18 +97,22 @@ function App() {
       }
 
       console.log(`[Audio] Decoding chunk... bytes: ${arrayBuffer.byteLength}`);
-      const decodedData = await window.sharedAudioContext.decodeAudioData(arrayBuffer);
+      // Clone the buffer since decodeAudioData neuters/detaches the original
+      const clonedBuffer = arrayBuffer.slice(0);
+      const decodedData = await window.sharedAudioContext.decodeAudioData(clonedBuffer);
       console.log(`[Audio] Playing chunk: ${decodedData.duration.toFixed(2)}s`);
 
       const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
       source.connect(window.sharedAudioContext.destination);
       source.onended = () => {
+        setAudioDebug(prev => ({ ...prev, played: prev.played + 1 }));
         if (processQueueRef.current) processQueueRef.current();
       };
       source.start(0);
     } catch (error) {
       console.error('[Audio] Error playing audio:', error);
+      setAudioDebug(prev => ({ ...prev, errors: prev.errors + 1, lastError: error.message }));
       if (processQueueRef.current) processQueueRef.current();
     }
   }, []);
@@ -125,12 +131,14 @@ function App() {
   const onWebSocketMessage = useCallback((data) => {
     if (data instanceof ArrayBuffer) {
       console.log(`[Audio] Received binary chunk: ${data.byteLength} bytes`);
+      setAudioDebug(prev => ({ ...prev, received: prev.received + 1 }));
       playAudioBuffer(data);
       return;
     }
 
     if (data instanceof Blob) {
       console.log(`[Audio] Received blob chunk: ${data.size} bytes`);
+      setAudioDebug(prev => ({ ...prev, received: prev.received + 1 }));
       playAudioBuffer(data);
       return;
     }
@@ -623,6 +631,14 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* Audio Debug Telemetry */}
+      <div className="fixed bottom-0 left-0 w-full bg-black/80 text-white px-4 py-2 flex items-center justify-center gap-6 z-30 text-[10px] font-mono uppercase tracking-wider">
+        <span>Audio Received: <span className={audioDebug.received > 0 ? 'text-green-400' : 'text-red-400'}>{audioDebug.received}</span></span>
+        <span>Played: <span className={audioDebug.played > 0 ? 'text-green-400' : 'text-yellow-400'}>{audioDebug.played}</span></span>
+        <span>Errors: <span className={audioDebug.errors > 0 ? 'text-red-400' : 'text-green-400'}>{audioDebug.errors}</span></span>
+        {audioDebug.lastError && <span className="text-red-400">Last: {audioDebug.lastError.substring(0, 50)}</span>}
+      </div>
 
       <div className="fixed top-0 left-0 w-full h-[2px] bg-primary-green/20 overflow-hidden z-20 pointer-events-none">
         <div className="h-full bg-primary-green w-1/3 shadow-[0_0_10px_#13ec13] animate-[pulse_2s_infinite]"></div>
