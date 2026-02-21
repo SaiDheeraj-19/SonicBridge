@@ -35,7 +35,6 @@ function App() {
 
   const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   // Handle active theme class on body
   useEffect(() => {
@@ -75,26 +74,25 @@ function App() {
     }
 
     isPlayingRef.current = true;
-    const data = audioQueueRef.current.shift();
+    const buffer = audioQueueRef.current.shift();
 
     try {
       if (!window.sharedAudioContext) {
         window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
 
-      let arrayBuffer = data;
-      if (data instanceof Blob) {
-        arrayBuffer = await data.arrayBuffer();
+      // WebSocket returns binary messages as Blob. AudioContext requires ArrayBuffer.
+      let arrayBuffer = buffer;
+      if (buffer instanceof Blob) {
+        arrayBuffer = await buffer.arrayBuffer();
       }
 
+      // Resume context if suspended (browser autoplay policy)
       if (window.sharedAudioContext.state === 'suspended') {
         await window.sharedAudioContext.resume();
       }
 
-      console.log(`[Audio] Decoding chunk of size: ${arrayBuffer.byteLength} bytes`);
       const decodedData = await window.sharedAudioContext.decodeAudioData(arrayBuffer);
-      console.log(`[Audio] Decode success. Duration: ${decodedData.duration.toFixed(2)}s`);
-
       const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
       source.connect(window.sharedAudioContext.destination);
@@ -103,8 +101,7 @@ function App() {
       };
       source.start(0);
     } catch (error) {
-      console.error('[Audio] Playback Error:', error);
-      isPlayingRef.current = false;
+      console.error('Error playing audio:', error);
       if (processQueueRef.current) processQueueRef.current();
     }
   }, []);
@@ -114,7 +111,6 @@ function App() {
   }, [processAudioQueue]);
 
   const playAudioBuffer = useCallback(async (buffer) => {
-    // console.log(`[Audio] Received binary data: ${buffer.byteLength || buffer.size} bytes`);
     audioQueueRef.current.push(buffer);
     if (!isPlayingRef.current && processQueueRef.current) {
       processQueueRef.current();
@@ -135,7 +131,6 @@ function App() {
         } else if (msg.type === 'translation') {
           setTranslatedText(prev => prev + ' ' + msg.text);
         } else if (msg.type === 'roomCreated') {
-          setIsCreatingRoom(false);
           setRoomCode(msg.roomId);
           setCurrentView('host');
           setTranscript('');
@@ -148,7 +143,6 @@ function App() {
           setTranslatedText('');
           audioQueueRef.current = [];
         } else if (msg.type === 'error') {
-          setIsCreatingRoom(false);
           alert('SonicBridge System: ' + msg.message);
           setCurrentView('portal');
           setRoomCode('');
@@ -186,11 +180,14 @@ function App() {
     return () => clearInterval(pingInterval);
   }, [currentView, isConnected, sendMessage]);
 
-  useEffect(() => {
+  const handleLanguageChange = (newLang) => {
+    setTargetLang(newLang);
     if (currentView === 'participant' && roomCode) {
-      sendMessage(JSON.stringify({ type: 'updateLanguage', targetLang }));
+      setTranslatedText('');
+      audioQueueRef.current = [];
+      sendMessage(JSON.stringify({ type: 'updateLanguage', targetLang: newLang }));
     }
-  }, [targetLang, currentView, roomCode, sendMessage]);
+  };
 
   const onAudioChunk = useCallback((chunk) => {
     sendMessage(chunk);
@@ -278,15 +275,6 @@ function App() {
         {/* Create Room */}
         <div
           onClick={() => {
-            // Initialize AudioContext during explicit user interaction
-            if (!window.sharedAudioContext) {
-              window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (window.sharedAudioContext.state === 'suspended') {
-              window.sharedAudioContext.resume();
-            }
-
-            setIsCreatingRoom(true);
             sendMessage(JSON.stringify({ type: 'createRoom' }));
           }}
           className="premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group"
@@ -348,22 +336,6 @@ function App() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1px] h-24 bg-gradient-to-b from-[#E5E5E5] dark:from-white/10 to-transparent"></div>
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[1px] h-24 bg-gradient-to-t from-[#E5E5E5] dark:from-white/10 to-transparent"></div>
       </div>
-
-      {/* Creating Room Popup */}
-      {isCreatingRoom && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-paper-white/60 dark:bg-black/60 backdrop-blur-xl animate-fade-in">
-          <div className="flex flex-col items-center gap-8">
-            <div className="relative size-24">
-              <div className="absolute inset-0 rounded-full border-2 border-charcoal/5 dark:border-white/5"></div>
-              <div className="absolute inset-0 rounded-full border-t-2 border-charcoal dark:border-white animate-spin"></div>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <h3 className="dot-matrix text-[10px] tracking-[0.5em] opacity-40 uppercase">Establishing Link</h3>
-              <p className="small-caps text-[11px] font-medium opacity-80">Building Your Secure Workspace...</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -518,7 +490,7 @@ function App() {
           <div className="hidden sm:block">
             <label className="block px-1 text-[10px] text-black/40 dark:text-slate-500 uppercase tracking-tighter mb-1">Target Language</label>
             <div className="flex items-center border border-black/10 dark:border-white/20 rounded-lg px-2 hover:border-black/30 dark:hover:border-white/40 transition-colors cursor-pointer bg-white/40 dark:bg-black/40">
-              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-sm font-medium w-full py-1.5 pr-6 bg-transparent text-black dark:text-white outline-none cursor-pointer">
+              <select value={targetLang} onChange={(e) => handleLanguageChange(e.target.value)} className="text-sm font-medium w-full py-1.5 pr-6 bg-transparent text-black dark:text-white outline-none cursor-pointer">
                 {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-white text-black dark:bg-black dark:text-white">{l.name}</option>)}
               </select>
             </div>
@@ -541,13 +513,13 @@ function App() {
           <h2 className="text-sm font-light uppercase tracking-widest">{roomCode}</h2>
         </div>
 
-        <div className="w-full max-w-4xl h-[60vh] flex flex-col justify-end gap-12 custom-scrollbar overflow-y-auto pb-24 z-10 mx-auto px-4 mt-16 transcript-container">
-          <div className="text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
-            {translatedText ? translatedText : <span className="opacity-40 italic font-light text-2xl md:text-4xl text-center">Waiting for host audio...</span>}
+        <div className="w-full max-w-4xl h-[65vh] flex flex-col justify-end gap-12 custom-scrollbar overflow-y-auto pb-32 sm:pb-24 z-10 mx-auto px-4 mt-12 sm:mt-16 transcript-container">
+          <div className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
+            {translatedText ? translatedText : <span className="opacity-40 italic font-light text-xl sm:text-2xl md:text-4xl text-center">Waiting for host audio...</span>}
           </div>
         </div>
 
-        <div className="absolute bottom-12 w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center sm:items-end px-6 sm:px-10 gap-6 sm:gap-0">
+        <div className="absolute bottom-6 sm:bottom-12 w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center sm:items-end px-4 sm:px-10 gap-6 sm:gap-0 pb-safe">
           <div className="flex flex-col gap-1 items-center sm:items-start text-center sm:text-left hidden md:flex">
             <span className="dot-matrix text-[10px] text-black/40 dark:text-slate-500">Signal Strength</span>
             <div className="flex gap-1 justify-center sm:justify-start">
@@ -569,7 +541,7 @@ function App() {
           <div className="sm:hidden block w-full relative">
             <label className="block px-1 text-[10px] text-black/40 dark:text-slate-500 uppercase tracking-tighter mb-1 text-center">Target Language</label>
             <div className="flex mx-auto max-w-[200px] items-center border border-black/10 dark:border-white/20 rounded-lg px-2 transition-colors cursor-pointer bg-white/40 dark:bg-black/40">
-              <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="text-xs font-medium w-full py-2 bg-transparent text-charcoal dark:text-white outline-none cursor-pointer text-center">
+              <select value={targetLang} onChange={(e) => handleLanguageChange(e.target.value)} className="text-xs font-medium w-full py-2 bg-transparent text-charcoal dark:text-white outline-none cursor-pointer text-center">
                 {LANGUAGES.map(l => <option key={l.code} value={l.code} className="bg-white text-black dark:bg-black dark:text-white">{l.name}</option>)}
               </select>
             </div>
