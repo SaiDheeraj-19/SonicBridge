@@ -36,10 +36,6 @@ function App() {
   const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  // Calibration state
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [calibrationCountdown, setCalibrationCountdown] = useState(0);
-
   // Handle active theme class on body
   useEffect(() => {
     if (isDarkMode) {
@@ -48,7 +44,6 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
-
 
   // Handle host left automated teardown
   useEffect(() => {
@@ -69,6 +64,8 @@ function App() {
     }
     return () => clearTimeout(timer);
   }, [hostLeftCountdown]);
+
+
 
   const processAudioQueue = useCallback(async () => {
     if (audioQueueRef.current.length === 0) {
@@ -171,20 +168,6 @@ function App() {
   const fallbackUrl = isLocal ? `ws://${window.location.hostname}:5001` : 'wss://sonicbridge-backend.onrender.com';
   const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
   const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
-
-  // Handle calibration countdown
-  useEffect(() => {
-    let timer;
-    if (isCalibrating && calibrationCountdown > 0) {
-      timer = setTimeout(() => {
-        setCalibrationCountdown(prev => prev - 1);
-      }, 1000);
-    } else if (isCalibrating && calibrationCountdown === 0) {
-      setIsCalibrating(false);
-      sendMessage(JSON.stringify({ type: 'createRoom' }));
-    }
-    return () => clearTimeout(timer);
-  }, [isCalibrating, calibrationCountdown, sendMessage]);
 
   // Host ping interval for real-time latency calculate
   useEffect(() => {
@@ -289,12 +272,9 @@ function App() {
         {/* Create Room */}
         <div
           onClick={() => {
-            if (!isCalibrating) {
-              setCalibrationCountdown(10);
-              setIsCalibrating(true);
-            }
+            sendMessage(JSON.stringify({ type: 'createRoom' }));
           }}
-          className={`premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center group transition-all duration-500 ${isCalibrating ? 'opacity-0 scale-95 pointer-events-none absolute' : 'cursor-pointer relative z-10'}`}
+          className="premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group"
         >
           <h2 className="dot-matrix text-[10px] tracking-[0.4em] opacity-40">Create Room</h2>
           <div className="w-full flex-col flex items-center justify-center flex-1">
@@ -338,55 +318,6 @@ function App() {
           </div>
           <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">Secure Entry</p>
         </div>
-
-        {/* Calibration Overlay Layer */}
-        {isCalibrating && (
-          <div className="absolute inset-0 flex items-center justify-center z-50 animate-fade-in pointer-events-auto">
-            <div className="bg-paper-white dark:bg-[#0a0a0a] w-full max-w-[600px] rounded-[40px] shadow-[0_40px_100px_rgba(0,0,0,0.08)] dark:shadow-[0_40px_100px_rgba(0,0,0,0.5)] border border-charcoal/5 dark:border-white/5 p-16 flex flex-col items-center text-center">
-
-              <div className="relative size-40 rounded-full border border-charcoal/10 dark:border-white/10 flex items-center justify-center mb-12">
-                <span className="dot-matrix text-6xl font-light">{calibrationCountdown}</span>
-                <div className="absolute -bottom-4 bg-paper-white dark:bg-[#0a0a0a] px-4">
-                  <span className="small-caps text-[9px] opacity-40">SECONDS REMAINING</span>
-                </div>
-                {/* Sweep animation circle */}
-                <svg className="absolute inset-0 size-full -rotate-90">
-                  <circle cx="80" cy="80" r="79" fill="transparent" stroke="currentColor" strokeWidth="1" className="text-charcoal dark:text-white opacity-40 animate-[dash_10s_linear_forwards]" strokeDasharray="496" strokeDashoffset="0"></circle>
-                </svg>
-              </div>
-
-              <span className="small-caps text-[10px] opacity-40 mb-6">VOICE CALIBRATION SCRIPT</span>
-              <p className="text-2xl md:text-3xl font-light leading-snug tracking-tight mb-8">
-                "The integration of real-time linguistics requires precise vocal embedding to maintain tonal integrity."
-              </p>
-              <p className="text-sm opacity-50 mb-12 font-medium">
-                Please read the text above naturally to calibrate your voice embedding.<br />
-                Ensure your environment is silent and your tone is conversational.
-              </p>
-
-              <div className="w-full flex justify-between items-center pt-8 border-t border-charcoal/5 dark:border-white/5 opacity-50">
-                <div className="flex flex-col items-start gap-1">
-                  <span className="small-caps text-[10px] tracking-widest hidden md:block">NEURAL PROCESSING UNIT</span>
-                  <div className="flex items-center gap-2">
-                    <div className="size-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                    <span className="text-[10px] font-mono">Listening for ambient noise floor...</span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="small-caps text-[10px] tracking-widest">SIGNAL STRENGTH</span>
-                  <div className="flex gap-1 h-3 items-end">
-                    <div className="w-1 bg-charcoal dark:bg-white h-[40%] animate-pulse"></div>
-                    <div className="w-1 bg-charcoal dark:bg-white h-[70%] animate-pulse" style={{ animationDelay: '100ms' }}></div>
-                    <div className="w-1 bg-charcoal dark:bg-white h-[100%] animate-pulse" style={{ animationDelay: '200ms' }}></div>
-                    <div className="w-1 bg-charcoal dark:bg-white h-[80%] animate-pulse" style={{ animationDelay: '300ms' }}></div>
-                    <div className="w-1 bg-charcoal/30 dark:bg-white/30 h-[30%]"></div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
       </main>
 
       <footer className="w-full flex flex-col items-center justify-center mt-auto gap-8">
