@@ -291,6 +291,14 @@ function App() {
             />
             <button
               onClick={() => {
+                // Initialize AudioContext during explicit user interaction to bypass Autoplay Policies
+                if (!window.sharedAudioContext) {
+                  window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (window.sharedAudioContext.state === 'suspended') {
+                  window.sharedAudioContext.resume();
+                }
+
                 if (joinCode) {
                   const upperCode = joinCode.toUpperCase();
                   sendMessage(JSON.stringify({ type: 'joinRoom', roomId: upperCode, targetLang }));
@@ -298,7 +306,7 @@ function App() {
               }}
               className="btn-outline w-full max-w-[200px]"
             >
-              Join
+              Connect
             </button>
           </div>
           <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">Secure Entry</p>
