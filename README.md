@@ -24,17 +24,32 @@
   <table>
     <tr>
       <td align="center"><strong>Frontend Interface</strong><br/><code>React + Vite</code></td>
-      <td align="center"><strong>Design System</strong><br/><code>Tailwind CSS + Inter Font + Custom Utilities</code></td>
       <td align="center"><strong>Coordination Server</strong><br/><code>Node.js + ws WebSockets</code></td>
-      <td align="center"><strong>AI Engine</strong><br/><code>Sarvam REST APIs API (STT, Translate, TTS)</code></td>
+      <td align="center"><strong>AI Processing</strong><br/><code>SpeechBrain + PyTorch</code></td>
+      <td align="center"><strong>AI Pipeline</strong><br/><code>Sarvam AI APIs</code></td>
     </tr>
   </table>
 </div>
 
-### Why This Stack?
+### 🛠️ Advanced Technical Deep-Dive
 
-- **Frontend**: By heavily utilizing React Refs and WebSockets with an `arraybuffer` binary type, the UI handles 16000Hz raw PCM audio streaming completely seamlessly, avoiding browser tab crashes and performance hitches.
-- **Backend / Pipeline**: The backend functions as an audio switchboard. Instead of maintaining unreliable external upstream WebSockets with AI provider endpoints, it dynamically clusters returning audio via a custom "Pseudo-WebSocket" buffering technique—trading a few milliseconds of delay for a 100% stable connection profile against REST endpoints.
+#### 1. The Frontend (High-Performance Audio)
+- **React 19 & Vite**: Ultra-fast HMR and lean production builds.
+- **Web Audio API & AudioWorklets**: Heavy audio processing (32-bit float to 16kHz 16-bit PCM conversion) is shifted to a background thread (`audio-processor.js`) to keep the UI at a buttery-smooth 60fps even during heavy streaming.
+- **Tailwind CSS + Framer Motion**: A custom design system utilizing glassmorphism and hardware-accelerated micro-animations for a premium feel.
+
+#### 2. The Coordination Layer (Node.js)
+- **Node.js & WebSocket (ws)**: Handles real-time binary audio streams. It acts as an "audio switchboard," injecting RIFF headers to compile raw PCM into valid WAV chunks in-memory.
+- **Buffer Management**: Instead of maintaining unreliable external upstream WebSockets, the server uses a custom buffering technique—trading minimal latency for a 100% stable connection profile against REST endpoints.
+
+#### 3. AI & Vocal Intelligence (SpeechBrain Service)
+- **SpeechBrain & PyTorch**: A dedicated Python/FastAPI service for **Layer 4 Voice Locking**. It generates unique biometric voice embeddings to ensure the session only translates the Host, ignoring background noise.
+- **RNNoise & VAD**: Neural network-based noise suppression and Voice Activity Detection filter out silence/static before it hits the cloud APIs, saving quota and improving accuracy.
+- **Sarvam AI APIs**: The primary engine for multilingual STT, translation, and high-fidelity TTS across 7+ Indian languages.
+
+#### 4. Infrastructure & DevOps
+- **Docker & Compose**: Containerization of the client, backend, and the specialized AI microservice for consistent environment parity.
+- **Redis**: Low-latency session state and data synchronization.
 
 ## 🚀 Getting Started
 
