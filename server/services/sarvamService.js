@@ -107,7 +107,7 @@ class SarvamService {
             } catch (err) {
                 console.error('[Sarvam REST STT] Error:', err.response?.data || err.message);
             }
-        }, 3000); // 3-second intervals for stable translation phrases
+        }, 1200); // 1.2-second intervals for reduced latency while maintaining coherent STT
 
         return pseudoWs;
     }
