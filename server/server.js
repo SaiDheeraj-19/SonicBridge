@@ -260,28 +260,8 @@ wss.on('connection', (ws) => {
 
             const room = rooms.get(currentRoomId);
 
-            // SMART SILENCE DETECTION (Classroom-grade)
-            // Track consecutive silent/voiced chunks to prevent hallucinations during pauses
-            const hasVoice = voiceIsolationService.checkVoiceActivity(message);
-
-            if (!hasVoice) {
-                room.consecutiveSilentChunks++;
-                // After 10+ silent chunks (~1.3s at 128ms/chunk), stop forwarding
-                if (room.consecutiveSilentChunks > 10) {
-                    room.isSpeaking = false;
-                }
-                return; // Never forward silent chunks
-            }
-
-            // Voice detected — track consecutive voiced chunks
-            room.consecutiveSilentChunks = 0;
-
-            // Require 2+ consecutive voiced chunks to start forwarding
-            // This prevents single noise clicks from triggering STT
-            if (!room.isSpeaking) {
-                room.isSpeaking = true;
-                return; // Skip first voiced chunk (might be noise)
-            }
+            // Simple VAD — don't send silence to STT
+            if (!voiceIsolationService.checkVoiceActivity(message)) return;
 
             if (room.sarvamWs && room.sarvamWs.readyState === 1) {
                 // LAYER 2: RNNoise (pass-through when disabled)

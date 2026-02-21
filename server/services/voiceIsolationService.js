@@ -73,23 +73,9 @@ class VoiceIsolationService {
 
         const avgEnergy = energy / totalSamples;
 
-        // Threshold tuning based on typical 16-bit PCM silence values
-        // Raised to 200 to aggressively filter ambient noise that causes STT hallucinations
-        // Also check zero-crossing rate to distinguish speech from static noise
-        if (avgEnergy < 200) return false;
-
-        // Zero-crossing rate check: speech typically has moderate ZCR, noise has very high ZCR
-        let zeroCrossings = 0;
-        for (let i = 2; i < pcmAudioBuffer.length; i += 2) {
-            const prev = pcmAudioBuffer.readInt16LE(i - 2);
-            const curr = pcmAudioBuffer.readInt16LE(i);
-            if ((prev >= 0 && curr < 0) || (prev < 0 && curr >= 0)) {
-                zeroCrossings++;
-            }
-        }
-        const zcr = zeroCrossings / totalSamples;
-        // High ZCR (>0.5) with low-ish energy is likely noise, not speech
-        if (zcr > 0.5 && avgEnergy < 500) return false;
+        // Energy threshold: 50 is low enough to catch quiet laptop mics, 
+        // high enough to filter dead silence
+        if (avgEnergy < 50) return false;
 
         return true;
     }
