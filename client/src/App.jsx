@@ -21,7 +21,7 @@ function App() {
   const [sourceLang, setSourceLang] = useState('en-IN');
   const [targetLang, setTargetLang] = useState('hi-IN');
   const [transcript, setTranscript] = useState('');
-  const [translatedText, setTranslatedText] = useState('');
+  const [_translatedText, setTranslatedText] = useState('');
 
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
@@ -37,6 +37,8 @@ function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [audioDebug, setAudioDebug] = useState({ received: 0, played: 0, errors: 0, lastError: '' });
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [translatedSentences, setTranslatedSentences] = useState([]); // Scrolling sentence list for classroom
+  const transcriptEndRef = useRef(null);
 
   // Handle active theme class on body
   useEffect(() => {
@@ -66,6 +68,13 @@ function App() {
     }
     return () => clearTimeout(timer);
   }, [hostLeftCountdown]);
+
+  // Auto-scroll to latest sentence in classroom view
+  useEffect(() => {
+    if (transcriptEndRef.current) {
+      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [translatedSentences]);
 
 
 
@@ -166,18 +175,23 @@ function App() {
         if (msg.type === 'transcript') {
           setTranscript(prev => prev + ' ' + msg.text);
         } else if (msg.type === 'translation') {
-          setTranslatedText(prev => prev + ' ' + msg.text);
+          // Push each translated sentence as a separate entry for scrolling classroom view
+          setTranslatedSentences(prev => [...prev, { text: msg.text, time: new Date().toLocaleTimeString() }]);
+          setTranslatedText(msg.text); // Keep latest for display fallback
         } else if (msg.type === 'roomCreated') {
           setRoomCode(msg.roomId);
           setCurrentView('host');
           setTranscript('');
           setTranslatedText('');
+          setTranslatedSentences([]);
           audioQueueRef.current = [];
         } else if (msg.type === 'joined') {
           setRoomCode(msg.roomId);
           setCurrentView('participant');
           setTranscript('');
           setTranslatedText('');
+          setTranslatedSentences([]);
+          setAudioDebug({ received: 0, played: 0, errors: 0, lastError: '' });
           audioQueueRef.current = [];
 
           // AudioContext check on join
@@ -654,10 +668,26 @@ function App() {
           <h2 className="text-sm font-light uppercase tracking-widest">{roomCode}</h2>
         </div>
 
-        <div className="w-full max-w-4xl h-[65vh] flex flex-col gap-12 custom-scrollbar overflow-y-auto pb-32 sm:pb-24 z-10 mx-auto px-4 mt-12 sm:mt-16 transcript-container">
-          <div className="mt-auto text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
-            {translatedText ? translatedText : (transcript ? <span className="opacity-60 font-light">{transcript}</span> : <span className="opacity-40 italic font-light text-xl sm:text-2xl md:text-4xl text-center">Waiting for host audio...</span>)}
-          </div>
+        <div className="w-full max-w-4xl h-[65vh] flex flex-col custom-scrollbar overflow-y-auto pb-32 sm:pb-24 z-10 mx-auto px-4 mt-12 sm:mt-16 transcript-container">
+          {translatedSentences.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <span className="opacity-40 italic font-light text-xl sm:text-2xl md:text-4xl text-center">
+                Waiting for speaker...
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6 mt-auto">
+              {translatedSentences.map((sentence, idx) => (
+                <div key={idx} className="animate-[fadeIn_0.3s_ease-in]">
+                  <p className={`text-xl sm:text-2xl md:text-3xl lg:text-4xl font-medium leading-relaxed text-center tracking-tight text-charcoal dark:text-white ${idx === translatedSentences.length - 1 ? 'opacity-100' : 'opacity-60'}`}>
+                    {sentence.text}
+                  </p>
+                  <p className="text-[9px] text-center mt-1 opacity-20 font-mono">{sentence.time}</p>
+                </div>
+              ))}
+              <div ref={transcriptEndRef} />
+            </div>
+          )}
         </div>
 
         <div className="absolute bottom-6 sm:bottom-12 w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center sm:items-end px-4 sm:px-10 gap-6 sm:gap-0 pb-safe">
