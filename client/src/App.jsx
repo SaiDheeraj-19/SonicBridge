@@ -88,10 +88,13 @@ function App() {
     isPlayingRef.current = true;
     const buffer = audioQueueRef.current.shift();
 
+    const advanceQueue = () => {
+      if (processQueueRef.current) processQueueRef.current();
+    };
+
     try {
       if (!window.sharedAudioContext) {
         window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-        console.log('[Audio] Created AudioContext in processQueue');
       }
 
       let arrayBuffer = buffer;
@@ -99,53 +102,82 @@ function App() {
         arrayBuffer = await buffer.arrayBuffer();
       }
 
-      // Resume context with a timeout to prevent infinite hang
+      // Resume context with timeout
       if (window.sharedAudioContext.state === 'suspended') {
-        console.warn('[Audio] Context suspended, attempting resume with timeout...');
         try {
           await Promise.race([
             window.sharedAudioContext.resume(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Resume timed out - tap screen to unlock audio')), 2000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Resume timeout')), 2000))
           ]);
-        } catch (resumeErr) {
-          console.error('[Audio] Resume failed:', resumeErr.message);
-          setAudioDebug(prev => ({ ...prev, errors: prev.errors + 1, lastError: resumeErr.message }));
-          // Don't block the queue — skip this chunk and try next
-          if (processQueueRef.current) processQueueRef.current();
+        } catch {
+          setAudioDebug(prev => ({ ...prev, errors: prev.errors + 1, lastError: 'AudioContext suspended - tap screen' }));
+          advanceQueue();
           return;
         }
       }
 
-      console.log(`[Audio] Decoding chunk... bytes: ${arrayBuffer.byteLength}`);
       const clonedBuffer = arrayBuffer.slice(0);
       const decodedData = await window.sharedAudioContext.decodeAudioData(clonedBuffer);
-      console.log(`[Audio] Playing chunk: ${decodedData.duration.toFixed(2)}s`);
+
+      // Skip zero-duration or corrupt audio
+      if (!decodedData || decodedData.duration < 0.1) {
+        advanceQueue();
+        return;
+      }
 
       const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
 
-      // Apply gain boost — Sarvam TTS WAV files are relatively quiet
       const gainNode = window.sharedAudioContext.createGain();
-      gainNode.gain.value = 2.0; // 2x volume boost
+      gainNode.gain.value = 2.0;
       source.connect(gainNode);
       gainNode.connect(window.sharedAudioContext.destination);
 
-      console.log(`[Audio] Playing: ${decodedData.duration.toFixed(2)}s, gain: 2.0x, dest channels: ${window.sharedAudioContext.destination.channelCount}`);
-      source.onended = () => {
+      // Guard: prevent double-advance from both onended AND safety timeout
+      let hasAdvanced = false;
+      const safeAdvance = () => {
+        if (hasAdvanced) return;
+        hasAdvanced = true;
         setAudioDebug(prev => ({ ...prev, played: prev.played + 1 }));
-        if (processQueueRef.current) processQueueRef.current();
+        advanceQueue();
       };
+
+      source.onended = safeAdvance;
+
+      // SAFETY TIMEOUT: If onended doesn't fire (browser bug, GC'd node, short clip),
+      // force-advance the queue after expected duration + 500ms
+      const safetyMs = Math.ceil(decodedData.duration * 1000) + 500;
+      setTimeout(() => {
+        if (!hasAdvanced) {
+          console.warn(`[Audio] Safety timeout fired after ${safetyMs}ms — onended didn't fire`);
+          safeAdvance();
+        }
+      }, safetyMs);
+
       source.start(0);
     } catch (error) {
-      console.error('[Audio] Error playing audio:', error);
+      console.error('[Audio] Playback error:', error.message);
       setAudioDebug(prev => ({ ...prev, errors: prev.errors + 1, lastError: error.message }));
-      if (processQueueRef.current) processQueueRef.current();
+      advanceQueue();
     }
   }, []);
 
   useEffect(() => {
     processQueueRef.current = processAudioQueue;
   }, [processAudioQueue]);
+
+  // Watchdog: unstick the audio queue if it gets jammed
+  useEffect(() => {
+    const watchdog = setInterval(() => {
+      if (audioQueueRef.current.length > 0 && isPlayingRef.current) {
+        // Queue has items but nothing is happening — force unstick
+        console.warn(`[Audio Watchdog] Queue stuck with ${audioQueueRef.current.length} items — forcing restart`);
+        isPlayingRef.current = false;
+        if (processQueueRef.current) processQueueRef.current();
+      }
+    }, 3000);
+    return () => clearInterval(watchdog);
+  }, []);
 
   const playAudioBuffer = useCallback(async (buffer) => {
     audioQueueRef.current.push(buffer);
@@ -156,14 +188,12 @@ function App() {
 
   const onWebSocketMessage = useCallback((data) => {
     if (data instanceof ArrayBuffer) {
-      console.log(`[Audio] Received binary chunk: ${data.byteLength} bytes`);
       setAudioDebug(prev => ({ ...prev, received: prev.received + 1 }));
       playAudioBuffer(data);
       return;
     }
 
     if (data instanceof Blob) {
-      console.log(`[Audio] Received blob chunk: ${data.size} bytes`);
       setAudioDebug(prev => ({ ...prev, received: prev.received + 1 }));
       playAudioBuffer(data);
       return;
