@@ -138,7 +138,9 @@ wss.on('connection', (ws) => {
                                         const translatedText = await sarvamService.translateText(text, targetLanguage);
 
                                         // 2. TTS
+                                        console.log(`[TTS] Generating audio for ${targetLanguage}: "${translatedText.substring(0, 30)}..."`);
                                         const audioBuffer = await sarvamService.textToSpeech(translatedText, targetLanguage);
+                                        console.log(`[TTS] Success. Buffer size: ${audioBuffer.length} bytes`);
 
                                         // 3. Broadcast to all users requesting this language
                                         room.users.forEach(user => {
