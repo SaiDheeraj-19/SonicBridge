@@ -36,6 +36,7 @@ function App() {
   const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
   const [audioDebug, setAudioDebug] = useState({ received: 0, played: 0, errors: 0, lastError: '' });
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   // Handle active theme class on body
   useEffect(() => {
@@ -84,20 +85,29 @@ function App() {
         console.log('[Audio] Created AudioContext in processQueue');
       }
 
-      // WebSocket returns binary messages as Blob. AudioContext requires ArrayBuffer.
       let arrayBuffer = buffer;
       if (buffer instanceof Blob) {
         arrayBuffer = await buffer.arrayBuffer();
       }
 
-      // Resume context if suspended (browser autoplay policy)
+      // Resume context with a timeout to prevent infinite hang
       if (window.sharedAudioContext.state === 'suspended') {
-        console.warn('[Audio] Context suspended, attempting auto-resume...');
-        await window.sharedAudioContext.resume();
+        console.warn('[Audio] Context suspended, attempting resume with timeout...');
+        try {
+          await Promise.race([
+            window.sharedAudioContext.resume(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Resume timed out - tap screen to unlock audio')), 2000))
+          ]);
+        } catch (resumeErr) {
+          console.error('[Audio] Resume failed:', resumeErr.message);
+          setAudioDebug(prev => ({ ...prev, errors: prev.errors + 1, lastError: resumeErr.message }));
+          // Don't block the queue — skip this chunk and try next
+          if (processQueueRef.current) processQueueRef.current();
+          return;
+        }
       }
 
       console.log(`[Audio] Decoding chunk... bytes: ${arrayBuffer.byteLength}`);
-      // Clone the buffer since decodeAudioData neuters/detaches the original
       const clonedBuffer = arrayBuffer.slice(0);
       const decodedData = await window.sharedAudioContext.decodeAudioData(clonedBuffer);
       console.log(`[Audio] Playing chunk: ${decodedData.duration.toFixed(2)}s`);
@@ -553,6 +563,47 @@ function App() {
   // --- Participant View ---
   const renderParticipant = () => (
     <div className="participant-bg text-charcoal dark:text-slate-100 min-h-screen flex flex-col w-full relative transition-colors duration-500">
+
+      {/* Audio Unlock Overlay — REQUIRED for browser autoplay policy */}
+      {!audioUnlocked && (
+        <div
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl cursor-pointer"
+          onClick={() => {
+            // Create or resume AudioContext during this user gesture
+            if (!window.sharedAudioContext) {
+              window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const ctx = window.sharedAudioContext;
+
+            // Resume if suspended
+            if (ctx.state === 'suspended') {
+              ctx.resume();
+            }
+
+            // Play a silent buffer to fully unlock the audio output
+            const silentBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+            const source = ctx.createBufferSource();
+            source.buffer = silentBuffer;
+            source.connect(ctx.destination);
+            source.start(0);
+
+            console.log('[Audio] Unlocked via user gesture. State:', ctx.state);
+            setAudioUnlocked(true);
+
+            // Flush any queued audio that arrived before unlock
+            if (audioQueueRef.current.length > 0 && processQueueRef.current) {
+              isPlayingRef.current = false;
+              processQueueRef.current();
+            }
+          }}
+        >
+          <span className="material-symbols-outlined text-[80px] text-white/80 mb-6 animate-pulse">volume_up</span>
+          <h2 className="text-white text-2xl font-bold tracking-tight mb-2">Tap to Enable Audio</h2>
+          <p className="text-white/50 text-sm tracking-wider">Browser requires your interaction to play sound</p>
+        </div>
+      )}
+
       <header className="glass-header sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('portal')}>
