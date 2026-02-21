@@ -513,8 +513,8 @@ function App() {
           <h2 className="text-sm font-light uppercase tracking-widest">{roomCode}</h2>
         </div>
 
-        <div className="w-full max-w-4xl h-[65vh] flex flex-col justify-end gap-12 custom-scrollbar overflow-y-auto pb-32 sm:pb-24 z-10 mx-auto px-4 mt-12 sm:mt-16 transcript-container">
-          <div className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
+        <div className="w-full max-w-4xl h-[65vh] flex flex-col gap-12 custom-scrollbar overflow-y-auto pb-32 sm:pb-24 z-10 mx-auto px-4 mt-12 sm:mt-16 transcript-container">
+          <div className="mt-auto text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
             {translatedText ? translatedText : <span className="opacity-40 italic font-light text-xl sm:text-2xl md:text-4xl text-center">Waiting for host audio...</span>}
           </div>
         </div>
