@@ -153,72 +153,63 @@ wss.on('connection', (ws) => {
                             const words = lowerText.split(/\s+/);
                             if (words.length >= 2 && new Set(words).size === 1) return;
 
-                            // === SENTENCE ACCUMULATION ===
-                            room.sentenceBuffer += ' ' + trimmed;
-                            room.lastTranslate = (room.lastTranslate || '') + ' ' + (result.translate || '');
-
                             // Send host live transcript immediately
                             if (room.hostWs && room.hostWs.readyState === 1) {
                                 room.hostWs.send(JSON.stringify({ type: 'transcript', text: trimmed }));
                             }
 
-                            // Flush conditions — must be aggressive enough that translation actually happens
-                            const hasSentenceEnd = /[.!?।॥]/.test(room.sentenceBuffer.trim());
-                            const timeSinceLastSentence = Date.now() - room.lastSentenceTime;
-                            const bufferWordCount = room.sentenceBuffer.trim().split(/\s+/).length;
+                            // === TRANSLATE + TTS EVERY VALID RESULT ===
+                            if (!result.is_final) return;
 
-                            // Flush when: sentence ending detected OR 4+ words OR 4+ seconds elapsed
-                            const shouldFlush = result.is_final && (
-                                hasSentenceEnd ||
-                                bufferWordCount >= 4 ||
-                                timeSinceLastSentence > 4000
-                            );
+                            const sourceText = result.translate || trimmed;
+                            const sourceLang = result.translate ? 'en-IN' : data.sourceLang;
 
-                            if (!shouldFlush) return;
+                            console.log(`[Pipeline] Flushing: "${trimmed.substring(0, 40)}" → translate from ${sourceLang}`);
 
-                            // Grab the accumulated sentence and reset
-                            const fullSentence = room.sentenceBuffer.trim();
-                            const translateSource = room.lastTranslate.trim() || fullSentence;
-                            room.sentenceBuffer = '';
-                            room.lastTranslate = '';
-                            room.lastSentenceTime = Date.now();
-
-                            if (fullSentence.length < 3) return;
-
-                            // Find unique languages and translate + TTS
                             const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
+                            if (uniqueLanguages.length === 0) {
+                                console.log('[Pipeline] No listeners connected, skipping');
+                                return;
+                            }
 
                             await Promise.all(uniqueLanguages.map(async (targetLanguage) => {
                                 if (!targetLanguage || typeof targetLanguage !== 'string') return;
                                 try {
-                                    const sourceLang = translateSource !== fullSentence ? 'en-IN' : data.sourceLang;
-                                    const sourceText = translateSource !== fullSentence ? translateSource : fullSentence;
-
-                                    // 1. Translate the full sentence
+                                    // 1. Translate
+                                    console.log(`[Pipeline] Translating to ${targetLanguage}...`);
                                     const translatedText = await sarvamService.translateText(sourceText, targetLanguage, sourceLang);
+                                    console.log(`[Pipeline] Translated: "${translatedText.substring(0, 40)}"`);
 
-                                    // 2. TTS the full sentence
+                                    // 2. TTS
+                                    console.log(`[Pipeline] TTS for ${targetLanguage}...`);
                                     const audioBuffer = await sarvamService.textToSpeech(translatedText, targetLanguage);
+                                    console.log(`[Pipeline] TTS done: ${audioBuffer.length} bytes`);
 
                                     // 3. Broadcast to matching users
+                                    let sent = 0;
                                     room.users.forEach(user => {
                                         if (user.language === targetLanguage && user.ws.readyState === 1) {
                                             user.ws.send(JSON.stringify({ type: 'translation', text: translatedText }));
                                             user.ws.send(audioBuffer);
+                                            sent++;
                                         }
                                     });
+                                    console.log(`[Pipeline] Sent to ${sent} ${targetLanguage} users`);
                                 } catch (err) {
-                                    console.error(`[Pipeline] Error for ${targetLanguage}:`, err.message);
+                                    console.error(`[Pipeline] FAILED for ${targetLanguage}:`, err.message);
                                     // Fallback: try TTS with original text
                                     try {
-                                        const fallbackAudio = await sarvamService.textToSpeech(fullSentence, targetLanguage);
+                                        const fallbackAudio = await sarvamService.textToSpeech(trimmed, targetLanguage);
                                         room.users.forEach(user => {
                                             if (user.language === targetLanguage && user.ws.readyState === 1) {
-                                                user.ws.send(JSON.stringify({ type: 'translation', text: fullSentence }));
+                                                user.ws.send(JSON.stringify({ type: 'translation', text: trimmed }));
                                                 user.ws.send(fallbackAudio);
                                             }
                                         });
-                                    } catch (e) { /* silent fail */ }
+                                        console.log(`[Pipeline] Fallback TTS sent for ${targetLanguage}`);
+                                    } catch (e) {
+                                        console.error(`[Pipeline] Fallback also failed:`, e.message);
+                                    }
                                 }
                             }));
                         },
