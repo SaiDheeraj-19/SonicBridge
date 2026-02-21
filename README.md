@@ -2,86 +2,122 @@
   <img src="./client/public/favicon.png" alt="SonicBridge Logo" width="350"/>
   <br/>
   <h1>SonicBridge 🎙️⚡🌐</h1>
-  <p><strong>Bridging voices through real-time AI translation.</strong></p>
+  <p><strong>Real-time AI speech translation for classrooms, meetings, and live events.</strong></p>
+  <br/>
+
+  [![Live Demo](https://img.shields.io/badge/🔴_LIVE_DEMO-sonic--bridge--cyan.vercel.app-00C853?style=for-the-badge)](https://sonic-bridge-cyan.vercel.app)
+  [![GitHub](https://img.shields.io/badge/GitHub-SonicBridge-181717?style=for-the-badge&logo=github)](https://github.com/SaiDheeraj-19/SonicBridge)
+
 </div>
 
 ---
 
-**SonicBridge** is a highly polished, production-ready, real-time speech-to-speech translation platform. It captures live audio from a Host, processes and translates it near-instantly using Sarvam AI's localized LLMs, and broadcasts the translated speech directly into the ears of all connected Listeners with ultra-low latency.
+**SonicBridge** is a production-ready, real-time speech-to-speech translation platform built for **classrooms, meetings, and conferences**. A speaker talks naturally in their language — listeners hear the translated speech in their chosen language, live. Built with Sarvam AI's Indic language models for unmatched accuracy across 10+ Indian languages.
+
+## 🎯 Use Cases
+
+| Scenario | How SonicBridge Helps |
+|----------|----------------------|
+| 🏫 **Classrooms** | Professor lectures in English → Students hear in Telugu, Hindi, Tamil, etc. with scrollable transcript |
+| 🏢 **Corporate Meetings** | Multi-lingual teams collaborate without language barriers |
+| 🎤 **Conferences & Events** | Speaker broadcasts to hundreds of participants in their preferred language |
+| 🏥 **Healthcare** | Doctors communicate with patients across language barriers |
 
 ## ✨ Key Features
 
-- **Real-Time AI Sync & Streaming**: End-to-end latency optimized to < 1.2s using WebSockets and buffered REST endpoints.
-- **Premium User Interface**: Sleek, immersive dark mode design featuring interactive micro-animations, glassmorphism, and dynamic visualizations.
-- **Native Browser Audio Hardware**: Utilizes the modern `AudioWorklet` and native Web Audio API for hardware-accelerated playback and microphone isolation.
-- **Multi-Lingual Broadcasts**: A single Host can speak in English while Listeners individually hear translations in Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi, or Bengali simultaneously.
-- **AI Hallucination Filtering**: Intelligently detects and strips out common silence-induced AI STT hallucinations (e.g., "*Yeah*", "*Okay*") before they ever reach the translation pipeline.
-- **One-Click Session Sharing**: Instantly generate and copy secure room keys and URLs to invite listeners straight from the dashboard.
+### Core Platform
+- **Real-Time Speech Translation** — Speak in one language, listeners hear in another within ~4-6 seconds
+- **10+ Indian Languages** — Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Odia, Punjabi
+- **Text + Voice Output** — Participants see translated text AND hear TTS audio simultaneously
+- **Room-Based Sessions** — Secure 8-character room codes, shareable via one-click copy
 
-## 🏗️ Architecture & Tech Stack
+### Classroom-Grade Intelligence
+- **Sentence Accumulation** — Waits for complete sentences (`.` `?` `!`) before translating, producing coherent output instead of fragments
+- **Smart Silence Detection** — Tracks consecutive voiced/silent chunks. Teacher pausing to write on the board generates zero hallucinations
+- **Anti-Hallucination System** — 3-layer filter: exact match (40+ words), short fragment detection, repetitive text detection
+- **Scrolling Transcript** — Students see a scrollable list of individually translated sentences with timestamps for reference
+
+### Audio Engineering
+- **Bulletproof Audio Queue** — Safety timeouts, double-advance guards, and a 3-second watchdog prevent audio from ever getting stuck
+- **Browser Autoplay Unlock** — Tap-to-enable overlay satisfies browser policies, then auto-plays all queued audio
+- **2x Gain Boost** — TTS output amplified through Web Audio GainNode for clear classroom playback
+- **AudioWorklet Processing** — 128ms buffer (2048 samples @ 16kHz) for low-latency capture without blocking the UI thread
+
+### Voice Isolation Pipeline
+- **Layer 1**: Browser-level noise suppression, echo cancellation, auto-gain (WebRTC constraints)
+- **Layer 2**: RNNoise neural suppression (production-ready, disabled in dev)
+- **Layer 3**: Energy-based VAD with zero-crossing rate analysis (threshold: 200 + ZCR filter)
+- **Layer 4**: SpeechBrain speaker verification via cosine similarity (auto-detected microservice)
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────┐     WebSocket (Binary PCM)     ┌──────────────────────┐
+│   HOST (Browser)    │ ──────────────────────────────▶ │   Node.js Server     │
+│                     │                                 │                      │
+│ • getUserMedia      │                                 │ • VAD + Silence Track│
+│ • AudioWorklet      │                                 │ • WAV Header Inject  │
+│ • PCM 16kHz 16-bit  │                                 │ • Buffer → Sarvam STT│
+└─────────────────────┘                                 │ • Translate → TTS    │
+                                                        │ • Sentence Accumulate│
+┌─────────────────────┐     WebSocket (JSON + WAV)      │                      │
+│ PARTICIPANT (Browser)│ ◀──────────────────────────────│ • Broadcast per-lang │
+│                     │                                 └──────────────────────┘
+│ • Translated Text   │                                          │
+│ • TTS Audio Playback│                                          ▼
+│ • Scrolling List    │                                 ┌──────────────────────┐
+│ • GainNode 2x Boost │                                 │   Sarvam AI APIs     │
+└─────────────────────┘                                 │ • STT (saaras:v2.5)  │
+                                                        │ • Translation        │
+                                                        │ • TTS (streaming)    │
+                                                        └──────────────────────┘
+```
+
+### Tech Stack
 
 <div align="center">
   <table>
     <tr>
-      <td align="center"><strong>Frontend Interface</strong><br/><code>React + Vite</code></td>
-      <td align="center"><strong>Coordination Server</strong><br/><code>Node.js + ws WebSockets</code></td>
-      <td align="center"><strong>AI Processing</strong><br/><code>SpeechBrain + PyTorch</code></td>
-      <td align="center"><strong>AI Pipeline</strong><br/><code>Sarvam AI APIs</code></td>
+      <td align="center"><strong>Frontend</strong><br/><code>React 19 + Vite</code><br/><code>Tailwind CSS</code><br/><code>Web Audio API</code></td>
+      <td align="center"><strong>Backend</strong><br/><code>Node.js + Express</code><br/><code>ws WebSockets</code><br/><code>Binary Audio Streams</code></td>
+      <td align="center"><strong>AI Pipeline</strong><br/><code>Sarvam AI STT</code><br/><code>Sarvam Translation</code><br/><code>Sarvam TTS</code></td>
+      <td align="center"><strong>Infrastructure</strong><br/><code>Vercel (Frontend)</code><br/><code>Render (Backend)</code><br/><code>Docker (Optional)</code></td>
     </tr>
   </table>
 </div>
-
-### 🛠️ Advanced Technical Deep-Dive
-
-#### 1. The Frontend (High-Performance Audio)
-- **React 19 & Vite**: Ultra-fast HMR and lean production builds.
-- **Web Audio API & AudioWorklets**: Heavy audio processing (32-bit float to 16kHz 16-bit PCM conversion) is shifted to a background thread (`audio-processor.js`) to keep the UI at a buttery-smooth 60fps even during heavy streaming.
-- **Tailwind CSS + Framer Motion**: A custom design system utilizing glassmorphism and hardware-accelerated micro-animations for a premium feel.
-
-#### 2. The Coordination Layer (Node.js)
-- **Node.js & WebSocket (ws)**: Handles real-time binary audio streams. It acts as an "audio switchboard," injecting RIFF headers to compile raw PCM into valid WAV chunks in-memory.
-- **Buffer Management**: Instead of maintaining unreliable external upstream WebSockets, the server uses a custom buffering technique—trading minimal latency for a 100% stable connection profile against REST endpoints.
-
-#### 3. AI & Vocal Intelligence (SpeechBrain Service)
-- **SpeechBrain & PyTorch**: A dedicated Python/FastAPI service for **Layer 4 Voice Locking**. It generates unique biometric voice embeddings to ensure the session only translates the Host, ignoring background noise.
-- **RNNoise & VAD**: Neural network-based noise suppression and Voice Activity Detection filter out silence/static before it hits the cloud APIs, saving quota and improving accuracy.
-- **Sarvam AI APIs**: The primary engine for multilingual STT, translation, and high-fidelity TTS across 7+ Indian languages.
-
-#### 4. Infrastructure & DevOps
-- **Docker & Compose**: Containerization of the client, backend, and the specialized AI microservice for consistent environment parity.
-- **Redis**: Low-latency session state and data synchronization.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 - Node.js (v18+)
-- Sarvam AI API Key (Get it from [sarvam.ai](https://www.sarvam.ai/))
+- Sarvam AI API Key → [sarvam.ai](https://www.sarvam.ai/)
 
 ### Environment Setup
 
-Create a `.env` file in the `server` directory and add your key:
+Create `.env` in the `server/` directory:
 ```env
 SARVAM_API_KEY=your_sarvam_api_key_here
 PORT=5000
 ```
 
-### Installation
-
-**1. Clone the repository**
-```bash
-git clone https://github.com/SaiDheeraj-19/SonicBridge.git
-cd SonicBridge
+Create `.env` in the `client/` directory:
+```env
+VITE_WS_URL=ws://localhost:5000
 ```
 
-**2. Start the Backend Server**
+### Installation
+
 ```bash
+# 1. Clone
+git clone https://github.com/SaiDheeraj-19/SonicBridge.git
+cd SonicBridge
+
+# 2. Start Backend
 cd server
 npm install
 npm run dev
-```
 
-**3. Start the Frontend Application**
-```bash
+# 3. Start Frontend (new terminal)
 cd ../client
 npm install
 npm run dev
@@ -89,20 +125,90 @@ npm run dev
 
 Visit `http://localhost:5173` to launch your first session.
 
+### Docker (Optional)
+
+```bash
+docker-compose up --build
+```
+
 ## 🎧 How It Works
 
-1. **Host Instantiation**: The host creates a unique 8-character cryptographic room code (`ROOM ID`).
-2. **Audio Intake**: The browser captures the Host's microphone via `getUserMedia`, isolates the vocal track via WebRTC constraints, and converts the 32-bit float array into a raw 16kHz PCM data stream via a custom `audio-processor.js` Web Worker.
-3. **Pipeline**: The Node.js server buffers ~1.2 second chunks of the stream, injecting RIFF headers to immediately compile them into valid `WAV` blobs in-memory for Sarvam AI.
-4. **Broadcast**: The translated text strings and returning AI-generated Base64 voice audio bytes are injected backward through the WebSocket and blasted out to every authenticated participant tuned into that `ROOM ID`.
+### For the Host (Speaker)
+1. **Create Room** — Click "Create Room" to generate a unique 8-character code
+2. **Share Code** — Copy the room code or share the URL with participants
+3. **Start Speaking** — Click the mic button and speak naturally
+4. **Live Transcript** — See your speech transcribed in real-time on screen
 
-## 🛡️ License & Legal
+### For Participants (Listeners)
+1. **Join Room** — Enter the room code and select your target language
+2. **Tap to Enable Audio** — One tap unlocks browser audio playback
+3. **Listen & Read** — Hear translated speech audio + see scrolling text transcript
+4. **Scroll Back** — Review previous sentences anytime during the session
 
-*Your privacy is prioritized.*
-Audio data is processed in real-time and is NOT stored on our servers after the session expires. Speech models are transient and bound strictly to the active room session lifecycle.
+## ⚡ Latency Breakdown
+
+| Pipeline Stage | Latency |
+|----------------|---------|
+| Audio capture (AudioWorklet) | ~128ms |
+| WebSocket transport | ~10ms (local) / ~300ms (deployed) |
+| VAD + silence detection | <1ms |
+| STT buffer accumulation | ~2000ms |
+| Sarvam STT API | ~500-1500ms |
+| Sarvam Translation API | ~300-600ms |
+| Sarvam TTS API | ~1000-2000ms |
+| Audio decode + playback | ~50ms |
+| **Total end-to-end** | **~4-6 seconds** |
+
+## 📁 Project Structure
+
+```
+SonicBridge/
+├── client/                      # React Frontend
+│   ├── public/
+│   │   └── audio-processor.js   # AudioWorklet (PCM capture)
+│   ├── src/
+│   │   ├── App.jsx              # Main app (Host + Participant views)
+│   │   ├── hooks/
+│   │   │   ├── useAudioRecorder.js  # Mic capture hook
+│   │   │   └── useWebSocket.js      # WS connection hook
+│   │   └── index.css            # Design system
+│   └── vite.config.js
+│
+├── server/                      # Node.js Backend
+│   ├── server.js                # WebSocket server + room management
+│   ├── services/
+│   │   ├── sarvamService.js     # Sarvam AI API integration
+│   │   └── voiceIsolationService.js  # VAD + voice isolation
+│   └── speechbrain_service/     # Optional Python microservice
+│       ├── Dockerfile
+│       └── README.md
+│
+├── docker-compose.yml
+└── README.md
+```
+
+## 🛡️ Privacy & Security
+
+- **No Audio Storage** — Audio data is processed in real-time and discarded after the session
+- **Room Isolation** — Each session operates in an isolated room with a unique cryptographic code
+- **Host-Only Audio** — Only the host can broadcast; participants are listen-only
+- **Transient Sessions** — All data (transcripts, audio, state) is destroyed when the room closes
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
 
 <br/>
 
 <div align="center">
-  <p className="text-[10px] opacity-20 tracking-widest uppercase">© 2026 SonicBridge Systems. v2.1.0</p>
+  <p>© 2026 SonicBridge · Built with ❤️ for breaking language barriers</p>
+  <p><sub>v3.0.0 · Classroom-Ready Edition</sub></p>
 </div>
