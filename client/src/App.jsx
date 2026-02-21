@@ -132,9 +132,15 @@ function App() {
         } else if (msg.type === 'roomCreated') {
           setRoomCode(msg.roomId);
           setCurrentView('host');
+          setTranscript('');
+          setTranslatedText('');
+          audioQueueRef.current = [];
         } else if (msg.type === 'joined') {
           setRoomCode(msg.roomId);
           setCurrentView('participant');
+          setTranscript('');
+          setTranslatedText('');
+          audioQueueRef.current = [];
         } else if (msg.type === 'error') {
           alert('SonicBridge System: ' + msg.message);
           setCurrentView('portal');
