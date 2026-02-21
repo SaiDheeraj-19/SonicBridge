@@ -554,10 +554,14 @@ function App() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md transition-all duration-300">
           <div className="bg-paper-white dark:bg-[#0a0a0a] p-10 rounded-[32px] max-w-sm w-full text-center shadow-2xl border border-charcoal/10 dark:border-white/10 mx-4">
             <span className="material-symbols-outlined text-[40px] text-red-500 mb-6 drop-shadow-[0_0_12px_rgba(239,68,68,0.4)]">warning</span>
-            <h3 className="text-xl font-bold tracking-tight text-charcoal dark:text-white mb-3">Host Terminated Session</h3>
-            <p className="text-sm text-charcoal/60 dark:text-slate-400 mb-8 font-medium leading-relaxed">
-              This room will automatically close in <span className="text-red-500 font-bold px-1 text-lg">{hostLeftCountdown}</span> seconds
+            <h3 className="text-xl font-bold tracking-tight text-charcoal dark:text-white mb-3">The meeting has ended</h3>
+            <p className="text-sm text-charcoal/60 dark:text-slate-400 mb-4 font-medium leading-relaxed">
+              The host has terminated the session.
             </p>
+            <div className="flex flex-col items-center justify-center p-4 bg-charcoal/5 dark:bg-white/5 rounded-2xl mb-8">
+              <span className="text-[32px] font-mono text-charcoal dark:text-white leading-none mb-1">{hostLeftCountdown}</span>
+              <span className="small-caps text-[10px] opacity-40">SECONDS REMAINING</span>
+            </div>
             <button
               onClick={() => { setHostLeftCountdown(null); setCurrentView('portal'); setRoomCode(''); setJoinCode(''); }}
               className="btn-outline w-full text-xs"
