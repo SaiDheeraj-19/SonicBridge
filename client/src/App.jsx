@@ -76,7 +76,9 @@ function App() {
     const buffer = audioQueueRef.current.shift();
 
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (!window.sharedAudioContext) {
+        window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
 
       // WebSocket returns binary messages as Blob. AudioContext requires ArrayBuffer.
       let arrayBuffer = buffer;
@@ -84,10 +86,15 @@ function App() {
         arrayBuffer = await buffer.arrayBuffer();
       }
 
-      const decodedData = await audioContext.decodeAudioData(arrayBuffer);
-      const source = audioContext.createBufferSource();
+      // Resume context if suspended (browser autoplay policy)
+      if (window.sharedAudioContext.state === 'suspended') {
+        await window.sharedAudioContext.resume();
+      }
+
+      const decodedData = await window.sharedAudioContext.decodeAudioData(arrayBuffer);
+      const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
-      source.connect(audioContext.destination);
+      source.connect(window.sharedAudioContext.destination);
       source.onended = () => {
         if (processQueueRef.current) processQueueRef.current();
       };
