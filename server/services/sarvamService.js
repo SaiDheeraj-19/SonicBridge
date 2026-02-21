@@ -55,13 +55,21 @@ class SarvamService {
             }
         };
 
-        // Every 2 seconds, grab the buffer, wrap in WAV, and send to Sarvam REST
+        // Every 2.5 seconds, grab the buffer, wrap in WAV, and send to Sarvam REST
+        // Longer intervals = more audio context per API call = higher accuracy
         pseudoWs.interval = setInterval(async () => {
             if (pseudoWs.audioBuffer.length === 0) return;
 
             // Combine all raw PCM chunks
             const rawPcm = Buffer.concat(pseudoWs.audioBuffer);
             pseudoWs.audioBuffer = []; // Clear for next batch
+
+            // Skip very short buffers (< 16KB = ~0.5s at 16kHz 16-bit mono)
+            // These produce garbage transcriptions
+            if (rawPcm.length < 16000) {
+                console.log(`[Sarvam REST STT] Skipping tiny buffer: ${rawPcm.length} bytes`);
+                return;
+            }
 
             // Re-wrap in a single WAV header
             const dataLength = rawPcm.length;
@@ -111,7 +119,7 @@ class SarvamService {
                 console.error('[Sarvam REST STT] Error:', errorMsg);
                 if (onError) onError(new Error(`Sarvam API: ${errorMsg}`));
             }
-        }, 1200); // 1.2-second intervals for reduced latency while maintaining coherent STT
+        }, 2500); // 2.5-second intervals for better accuracy with sufficient audio context
 
         return pseudoWs;
     }

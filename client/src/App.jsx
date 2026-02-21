@@ -114,7 +114,14 @@ function App() {
 
       const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
-      source.connect(window.sharedAudioContext.destination);
+
+      // Apply gain boost — Sarvam TTS WAV files are relatively quiet
+      const gainNode = window.sharedAudioContext.createGain();
+      gainNode.gain.value = 2.0; // 2x volume boost
+      source.connect(gainNode);
+      gainNode.connect(window.sharedAudioContext.destination);
+
+      console.log(`[Audio] Playing: ${decodedData.duration.toFixed(2)}s, gain: 2.0x, dest channels: ${window.sharedAudioContext.destination.channelCount}`);
       source.onended = () => {
         setAudioDebug(prev => ({ ...prev, played: prev.played + 1 }));
         if (processQueueRef.current) processQueueRef.current();

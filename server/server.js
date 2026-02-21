@@ -122,16 +122,52 @@ wss.on('connection', (ws) => {
 
                             if (!textToShowHost) return;
 
-                            // Filter out common AI silence hallucinations
-                            // Only filter if the text contains English-like short artifacts, ignoring actual regional content
-                            const lowerText = textToShowHost.trim().toLowerCase().replace(/[^a-z]/g, '');
-                            const hallucinations = ['yes', 'yeah', 'okay', 'ok', 'mhm', 'hmm', 'ah', 'oh'];
+                            // === COMPREHENSIVE ANTI-HALLUCINATION SYSTEM ===
+                            const trimmed = textToShowHost.trim();
+                            const lowerText = trimmed.toLowerCase().replace(/[^a-z\s]/g, '').trim();
 
-                            // If it's a short English artifact that's in the list AND the original text doesn't contain regional characters
-                            if (lowerText.length > 0 && hallucinations.includes(lowerText) && textToShowHost.length < 10) {
-                                console.log(`[STT Anti-Hallucination] Dropped silence artifact: "${textToShowHost}"`);
+                            // 1. Exact match hallucinations (common STT silence artifacts)
+                            const hallucinations = [
+                                'yes', 'yeah', 'yep', 'yea',
+                                'okay', 'ok', 'okey',
+                                'no', 'nah', 'nope',
+                                'mhm', 'hmm', 'hm', 'uh', 'um', 'uh huh',
+                                'ah', 'oh', 'ooh', 'aah',
+                                'bye', 'bye bye', 'goodbye',
+                                'thank you', 'thanks',
+                                'hello', 'hi', 'hey',
+                                'right', 'sure', 'fine',
+                                'so', 'well', 'now',
+                                'sir', 'madam', 'maam',
+                                'please', 'sorry',
+                                'you', 'i', 'we', 'it',
+                                'the', 'a', 'an', 'is', 'are', 'was',
+                                'do this', 'do that',
+                                'i see', 'i know',
+                            ];
+
+                            if (hallucinations.includes(lowerText)) {
+                                console.log(`[STT Anti-Hallucination] Dropped: "${trimmed}"`);
                                 return;
                             }
+
+                            // 2. Too short (less than 3 actual words) — usually noise
+                            const wordCount = lowerText.split(/\s+/).filter(w => w.length > 0).length;
+                            if (wordCount < 2 && trimmed.length < 15) {
+                                console.log(`[STT Anti-Hallucination] Dropped short fragment: "${trimmed}" (${wordCount} words)`);
+                                return;
+                            }
+
+                            // 3. Repetitive text detection (e.g., "yes yes yes" or "okay okay")
+                            const words = lowerText.split(/\s+/);
+                            if (words.length >= 2) {
+                                const uniqueWords = new Set(words);
+                                if (uniqueWords.size === 1) {
+                                    console.log(`[STT Anti-Hallucination] Dropped repetitive: "${trimmed}"`);
+                                    return;
+                                }
+                            }
+                            // === END ANTI-HALLUCINATION ===
 
                             // Send host the raw transcription text
                             if (room.hostWs && room.hostWs.readyState === 1) {
@@ -145,8 +181,10 @@ wss.on('connection', (ws) => {
                                 }
                             });
 
-                            // Only process translation/TTS for final phrases to save performance
-                            if (result.is_final && textToShowHost.trim().length > 0) {
+                            // Only process translation/TTS for final phrases with enough content
+                            // Minimum 3 words for TTS to avoid wasting API calls on fragments
+                            const finalWordCount = textToShowHost.trim().split(/\s+/).length;
+                            if (result.is_final && textToShowHost.trim().length > 0 && finalWordCount >= 3) {
                                 // Find unique languages requested in the room
                                 const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
 
