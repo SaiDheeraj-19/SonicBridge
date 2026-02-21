@@ -36,9 +36,12 @@ class SarvamService {
                 if (pseudoWs.readyState !== 1) return;
                 try {
                     const parsed = JSON.parse(dataStr);
-                    const chunkBuf = Buffer.from(parsed.audio.data, 'base64');
-                    // No longer skipping 44 bytes as host sends raw PCM chunks, not WAV files.
-                    pseudoWs.audioBuffer.push(chunkBuf);
+                    if (parsed.audio && parsed.audio.data) {
+                        const chunkBuf = Buffer.from(parsed.audio.data, 'base64');
+                        // Strip the 44-byte WAV header that server.js adds,
+                        // so we can cleanly concatenate raw PCM and re-wrap later.
+                        pseudoWs.audioBuffer.push(chunkBuf.length > 44 ? chunkBuf.subarray(44) : chunkBuf);
+                    }
                 } catch (e) {
                     console.error("PseudoWS parse error:", e.message);
                 }

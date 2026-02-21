@@ -249,7 +249,14 @@ function App() {
         type: 'start',
         sourceLang
       }));
-      await startRecording();
+      try {
+        await startRecording();
+      } catch (err) {
+        console.error('[Recording] Failed to start:', err);
+        // Clean up server-side STT stream since recording failed
+        sendMessage(JSON.stringify({ type: 'stop' }));
+        alert('Microphone access is required for broadcasting. Please allow microphone access and try again.\n\nError: ' + err.message);
+      }
     }
   };
 

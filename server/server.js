@@ -258,6 +258,7 @@ wss.on('connection', (ws) => {
             if (!hasVoice) return; // Drop chunk silently
 
             if (room.sarvamWs && room.sarvamWs.readyState === 1) {
+                console.log(`[Audio] Received ${message.length} bytes from host in room ${currentRoomId}`);
                 // LAYER 2: RNNoise Suppression
                 const cleanBuffer = await voiceIsolationService.applyRNNoise(message);
 
