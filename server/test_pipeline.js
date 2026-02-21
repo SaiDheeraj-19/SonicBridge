@@ -2,7 +2,7 @@ import sarvamService from './services/sarvamService.js';
 
 async function testPipeline() {
     const text = "Hello friends, I am checking the translation system.";
-    const targetLangs = ['hi-IN', 'te-IN', 'ta-IN'];
+    const targetLangs = ['hi-IN', 'te-IN', 'ta-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'bn-IN', 'en-IN'];
 
     console.log("Starting Pipeline Emulation...");
 
