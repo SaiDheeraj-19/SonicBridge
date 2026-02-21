@@ -274,8 +274,10 @@ function App() {
             SONICBRIDGE
           </h1>
           <div className="flex items-center gap-2 mt-4 opacity-40">
-            <span className="w-[6px] h-[6px] rounded-full bg-primary animate-pulse"></span>
-            <span className="text-[10px] uppercase tracking-widest font-medium">System Active</span>
+            <span className={`w-[6px] h-[6px] rounded-full ${isConnected ? 'bg-green-500' : 'bg-primary animate-pulse'}`}></span>
+            <span className="text-[10px] uppercase tracking-widest font-medium">
+              {isConnected ? 'System Ready' : 'System Initializing...'}
+            </span>
           </div>
         </div>
 
@@ -331,7 +333,7 @@ function App() {
           className={`premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <h2 className="dot-matrix text-[10px] tracking-[0.4em] opacity-40">
-            {isConnected ? 'Create Room' : 'Service Waking Up...'}
+            {isConnected ? 'Create Room' : 'Server Sleeping...'}
           </h2>
           <div className="w-full flex-col flex items-center justify-center flex-1">
             <button className={`w-20 h-20 rounded-full charcoal-circle flex items-center justify-center pointer-events-none ${!isConnected ? 'animate-pulse' : ''}`}>
@@ -340,7 +342,7 @@ function App() {
             {!isConnected && <p className="text-[10px] uppercase tracking-widest mt-4 opacity-30 animate-pulse">Establishing Connection</p>}
           </div>
           <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">
-            {isConnected ? 'Session Start' : 'Please Wait'}
+            {isConnected ? 'Session Start' : 'Spinning up instances...'}
           </p>
         </div>
 
@@ -357,7 +359,10 @@ function App() {
             />
             <button
               onClick={() => {
-                if (!isConnected) return;
+                if (!isConnected) {
+                  alert("The specialized AI backend is currently waking up (Cold Start). This usually takes 50-60 seconds on free servers. Please wait a moment!");
+                  return;
+                }
                 // Initialize AudioContext during explicit user interaction to bypass Autoplay Policies
                 if (!window.sharedAudioContext) {
                   window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -372,9 +377,9 @@ function App() {
                 }
               }}
               disabled={!isConnected}
-              className={`btn-outline w-full max-w-[200px] ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`btn-outline w-full max-w-[200px] ${!isConnected ? 'opacity-50 cursor-not-allowed animate-pulse' : ''}`}
             >
-              {isConnected ? 'Connect' : 'Initializing...'}
+              {isConnected ? 'Connect' : 'Waking Up...'}
             </button>
           </div>
           <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">Secure Entry</p>
@@ -383,9 +388,14 @@ function App() {
 
       <footer className="w-full flex flex-col items-center justify-center mt-auto gap-8">
         <div className="w-12 h-[1px] bg-[#E5E5E5] dark:bg-white/10"></div>
-        <p className="text-[8px] uppercase tracking-[0.8em] opacity-20 hover:opacity-100 transition-opacity cursor-default font-medium">
-          System v.1.0.42_S
-        </p>
+        <div className="flex flex-col items-center gap-1 opacity-20 hover:opacity-100 transition-opacity">
+          <p className="text-[8px] uppercase tracking-[0.8em] font-medium">
+            System v.1.0.42_S
+          </p>
+          <p className="text-[7px] uppercase tracking-widest font-mono">
+            Endpoint: {wsUrl.includes('localhost') ? 'Local Dev' : 'Production Cloud'}
+          </p>
+        </div>
       </footer>
 
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
