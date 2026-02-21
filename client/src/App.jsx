@@ -34,6 +34,7 @@ function App() {
   const [joinCode, setJoinCode] = useState('');
 
   const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Handle active theme class on body
   useEffect(() => {
@@ -356,12 +357,28 @@ function App() {
           <div className="inline-block px-4 py-1.5 border-b border-charcoal/5 dark:border-white/10 mb-4">
             <span className="small-caps text-[10px] opacity-40">PRIVATE BROADCAST ROOM</span>
           </div>
-          <h1 className="dot-matrix text-[6rem] md:text-[10rem] lg:text-[12rem] font-bold leading-none">
+          <h1
+            onClick={() => {
+              navigator.clipboard.writeText(roomCode);
+              setIsCopied(true);
+              setTimeout(() => setIsCopied(false), 2000);
+            }}
+            className="dot-matrix text-[6rem] md:text-[10rem] lg:text-[12rem] font-bold leading-none cursor-pointer hover:opacity-75 transition-opacity"
+            title="Click to copy Room ID"
+          >
             {roomCode}
           </h1>
-          <div className="flex justify-center pt-2">
-            <button className="small-caps text-[10px] opacity-40 hover:opacity-100 transition-opacity tracking-widest">
-              COPY ACCESS LINK
+          <div className="flex justify-center pt-2 h-4">
+            <button
+              onClick={() => {
+                const url = window.location.href.split('?')[0]; // clean url
+                navigator.clipboard.writeText(`Join my SonicBridge room: ${roomCode}\n${url}`);
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000);
+              }}
+              className="small-caps text-[10px] opacity-40 hover:opacity-100 transition-opacity tracking-widest"
+            >
+              {isCopied ? "COPIED TO CLIPBOARD" : "COPY ACCESS LINK"}
             </button>
           </div>
         </div>
