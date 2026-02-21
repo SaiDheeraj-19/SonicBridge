@@ -75,25 +75,26 @@ function App() {
     }
 
     isPlayingRef.current = true;
-    const buffer = audioQueueRef.current.shift();
+    const data = audioQueueRef.current.shift();
 
     try {
       if (!window.sharedAudioContext) {
         window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
 
-      // WebSocket returns binary messages as Blob. AudioContext requires ArrayBuffer.
-      let arrayBuffer = buffer;
-      if (buffer instanceof Blob) {
-        arrayBuffer = await buffer.arrayBuffer();
+      let arrayBuffer = data;
+      if (data instanceof Blob) {
+        arrayBuffer = await data.arrayBuffer();
       }
 
-      // Resume context if suspended (browser autoplay policy)
       if (window.sharedAudioContext.state === 'suspended') {
         await window.sharedAudioContext.resume();
       }
 
+      console.log(`[Audio] Decoding chunk of size: ${arrayBuffer.byteLength} bytes`);
       const decodedData = await window.sharedAudioContext.decodeAudioData(arrayBuffer);
+      console.log(`[Audio] Decode success. Duration: ${decodedData.duration.toFixed(2)}s`);
+
       const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
       source.connect(window.sharedAudioContext.destination);
@@ -102,7 +103,8 @@ function App() {
       };
       source.start(0);
     } catch (error) {
-      console.error('Error playing audio:', error);
+      console.error('[Audio] Playback Error:', error);
+      isPlayingRef.current = false;
       if (processQueueRef.current) processQueueRef.current();
     }
   }, []);
@@ -112,6 +114,7 @@ function App() {
   }, [processAudioQueue]);
 
   const playAudioBuffer = useCallback(async (buffer) => {
+    // console.log(`[Audio] Received binary data: ${buffer.byteLength || buffer.size} bytes`);
     audioQueueRef.current.push(buffer);
     if (!isPlayingRef.current && processQueueRef.current) {
       processQueueRef.current();
