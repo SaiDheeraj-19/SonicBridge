@@ -101,7 +101,8 @@ class SarvamService {
                     console.log("[Sarvam REST STT] Got transcript:", response.data.transcript);
                     onTranscript({
                         transcript: response.data.transcript,
-                        is_final: true // Trigger translation/TTS down the line
+                        translate: response.data.translate || response.data.transcript, // Fallback if no translate provided
+                        is_final: true
                     });
                 }
             } catch (err) {
@@ -118,12 +119,12 @@ class SarvamService {
      * @param {String} targetLanguageCode
      * @returns {Promise<String>}
      */
-    async translateText(text, targetLanguageCode) {
-        // Sarvam REST Translate endpoint currently supports translation between English and Indian languages
-        // Ensure source is en-IN if the STT output converts speech to English.
-        if (targetLanguageCode === 'en-IN') return text;
+    async translateText(text, targetLanguageCode, sourceLanguageCode = "en-IN") {
+        // Avoid redundant translation
+        if (targetLanguageCode === sourceLanguageCode) return text;
 
         try {
+            console.log(`[Sarvam Translate] ${sourceLanguageCode} -> ${targetLanguageCode}`);
             const response = await fetch('https://api.sarvam.ai/translate', {
                 method: "POST",
                 headers: {
@@ -132,7 +133,7 @@ class SarvamService {
                 },
                 body: JSON.stringify({
                     input: text.trim(),
-                    source_language_code: "en-IN", // Assuming STT output is English or we normalize to English first
+                    source_language_code: sourceLanguageCode,
                     target_language_code: targetLanguageCode,
                     speaker_gender: "Male",
                     mode: "formal",
@@ -157,12 +158,28 @@ class SarvamService {
 
     async textToSpeech(text, targetLanguageCode) {
         try {
+            // Recommendation for bulbul:v3 speakers per language
+            const speakerMap = {
+                'hi-IN': 'shubh',
+                'kn-IN': 'meera',
+                'ml-IN': 'meera',
+                'mr-IN': 'meera',
+                'ta-IN': 'pavithra',
+                'te-IN': 'sruthi',
+                'bn-IN': 'meera',
+                'en-IN': 'meera'
+            };
+
+            const speaker = speakerMap[targetLanguageCode] || 'meera';
+
+            console.log(`[Sarvam TTS] Requesting TTS for language: ${targetLanguageCode}, speaker: ${speaker}`);
+
             const response = await axios.post('https://api.sarvam.ai/text-to-speech', {
                 inputs: [text],
                 target_language_code: targetLanguageCode,
-                speaker: "shubh", // "shubh" per user request
+                speaker: speaker,
                 model: "bulbul:v3",
-                pace: 1.1,
+                pace: 1.0,
                 enable_preprocessing: true
             }, {
                 headers: {
@@ -171,16 +188,18 @@ class SarvamService {
                 }
             });
 
-            // Parse base64 string from bulbul:v3 back into a Buffer for WebSocket transmission
             if (response.data && response.data.audios && response.data.audios.length > 0) {
-                return Buffer.from(response.data.audios[0], 'base64');
+                const audioBuffer = Buffer.from(response.data.audios[0], 'base64');
+                console.log(`[Sarvam TTS] Received audio buffer for "${text.substring(0, 20)}...", length: ${audioBuffer.length} bytes`);
+                return audioBuffer;
             } else {
-                throw new Error("Invalid TTS response format");
+                throw new Error("Invalid TTS response format: 'audios' field missing or empty");
             }
 
         } catch (error) {
-            console.error('Sarvam TTS error:', error.response?.data || error.message);
-            throw error;
+            const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            console.error('[Sarvam TTS] error:', errorMsg);
+            throw new Error(`TTS Failed: ${errorMsg}`);
         }
     }
 }

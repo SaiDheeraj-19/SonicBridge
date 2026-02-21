@@ -110,51 +110,76 @@ wss.on('connection', (ws) => {
                             model: 'saaras:v2.5'
                         },
                         async (result) => {
-                            // Extract primary translation (which defaults to English output from STT-Translate)
-                            let text = result.transcript || result.translate;
+                            // Extract native transcript and English translation base
+                            let nativeText = result.transcript || '';
+                            let englishBase = result.translate || nativeText;
 
-                            if (!text) return;
+                            let textToShowHost = nativeText || englishBase;
+
+                            if (!textToShowHost) return;
 
                             // Filter out common AI silence hallucinations
-                            const lowerText = text.trim().toLowerCase().replace(/[^a-z]/g, '');
+                            // Only filter if the text contains English-like short artifacts, ignoring actual regional content
+                            const lowerText = textToShowHost.trim().toLowerCase().replace(/[^a-z]/g, '');
                             const hallucinations = ['yes', 'yeah', 'okay', 'ok', 'mhm', 'hmm', 'ah', 'oh'];
-                            if (hallucinations.includes(lowerText)) {
-                                console.log(`[STT Anti-Hallucination] Dropped silence artifact: "${text}"`);
+
+                            // If it's a short English artifact that's in the list AND the original text doesn't contain regional characters
+                            if (lowerText.length > 0 && hallucinations.includes(lowerText) && textToShowHost.length < 10) {
+                                console.log(`[STT Anti-Hallucination] Dropped silence artifact: "${textToShowHost}"`);
                                 return;
                             }
 
                             // Send host the raw transcription text
-                            room.hostWs.send(JSON.stringify({ type: 'transcript', text: text }));
+                            room.hostWs.send(JSON.stringify({ type: 'transcript', text: textToShowHost }));
 
                             // Only process translation/TTS for final phrases to save performance
-                            if (result.is_final && text.trim().length > 0) {
+                            if (result.is_final && textToShowHost.trim().length > 0) {
                                 // Find unique languages requested in the room
                                 const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
 
                                 // Optimization: Process each language parallelly
                                 await Promise.all(uniqueLanguages.map(async (targetLanguage) => {
                                     try {
+                                        // Determine source language for translation
+                                        // If Sarvam gave us a 'translate' field, it's English. Otherwise it's native.
+                                        const sourceText = result.translate || nativeText;
+                                        const sourceLang = result.translate ? "en-IN" : data.sourceLang;
+
+                                        console.log(`[Pipeline] Processing ${targetLanguage} using source (${sourceLang}): "${sourceText.substring(0, 30)}..."`);
+
                                         // 1. Translate
-                                        const translatedText = await sarvamService.translateText(text, targetLanguage);
+                                        const translatedText = await sarvamService.translateText(sourceText, targetLanguage, sourceLang);
+                                        console.log(`[Pipeline] Translated to ${targetLanguage}: "${translatedText.substring(0, 30)}..."`);
 
                                         // 2. TTS
                                         const audioBuffer = await sarvamService.textToSpeech(translatedText, targetLanguage);
 
-                                        // 3. Broadcast to all users requesting this language
+                                        // 3. Broadcast
+                                        let sentCount = 0;
                                         room.users.forEach(user => {
                                             if (user.language === targetLanguage && user.ws.readyState === 1) {
                                                 user.ws.send(JSON.stringify({ type: 'translation', text: translatedText }));
                                                 user.ws.send(audioBuffer);
+                                                sentCount++;
                                             }
                                         });
+                                        console.log(`[Pipeline] Broadcasted ${targetLanguage} audio to ${sentCount} users.`);
                                     } catch (err) {
-                                        console.error(`Pipeline failed for ${targetLanguage}:`, err.message);
-                                        // Fallback logic
-                                        room.users.forEach(user => {
-                                            if (user.language === targetLanguage && user.ws.readyState === 1) {
-                                                user.ws.send(JSON.stringify({ type: 'translation', text: text })); // Send original text
-                                            }
-                                        });
+                                        console.error(`[Pipeline] Failed for ${targetLanguage}:`, err.message);
+
+                                        // Fallback TTS: Try to at least speak the original native text if translation failed
+                                        try {
+                                            const fallbackAudio = await sarvamService.textToSpeech(textToShowHost, targetLanguage);
+                                            room.users.forEach(user => {
+                                                if (user.language === targetLanguage && user.ws.readyState === 1) {
+                                                    user.ws.send(JSON.stringify({ type: 'translation', text: textToShowHost }));
+                                                    user.ws.send(fallbackAudio);
+                                                }
+                                            });
+                                            console.log(`[Pipeline] Sent fallback audio for ${targetLanguage}`);
+                                        } catch (fallbackErr) {
+                                            console.error("[Pipeline] Fallback TTS also failed");
+                                        }
                                     }
                                 }));
                             }

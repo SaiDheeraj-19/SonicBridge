@@ -59,7 +59,8 @@ class VoiceIsolationService {
         const avgEnergy = energy / totalSamples;
 
         // Threshold tuning based on typical 16-bit PCM silence values
-        return avgEnergy > 50;
+        // Lowered to 20 for better sensitivity to quiet speech
+        return avgEnergy > 20;
     }
 
     /**

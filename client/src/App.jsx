@@ -67,6 +67,7 @@ function App() {
 
 
 
+
   const processAudioQueue = useCallback(async () => {
     if (audioQueueRef.current.length === 0) {
       isPlayingRef.current = false;
@@ -89,10 +90,14 @@ function App() {
 
       // Resume context if suspended (browser autoplay policy)
       if (window.sharedAudioContext.state === 'suspended') {
+        console.warn('[Audio] Context suspended, attempting auto-resume...');
         await window.sharedAudioContext.resume();
       }
 
+      console.log(`[Audio] Decoding chunk... bytes: ${arrayBuffer.byteLength}`);
       const decodedData = await window.sharedAudioContext.decodeAudioData(arrayBuffer);
+      console.log(`[Audio] Playing chunk: ${decodedData.duration.toFixed(2)}s`);
+
       const source = window.sharedAudioContext.createBufferSource();
       source.buffer = decodedData;
       source.connect(window.sharedAudioContext.destination);
@@ -101,7 +106,7 @@ function App() {
       };
       source.start(0);
     } catch (error) {
-      console.error('Error playing audio:', error);
+      console.error('[Audio] Error playing audio:', error);
       if (processQueueRef.current) processQueueRef.current();
     }
   }, []);
@@ -118,7 +123,14 @@ function App() {
   }, []);
 
   const onWebSocketMessage = useCallback((data) => {
-    if (data instanceof ArrayBuffer || data instanceof Blob) {
+    if (data instanceof ArrayBuffer) {
+      console.log(`[Audio] Received binary chunk: ${data.byteLength} bytes`);
+      playAudioBuffer(data);
+      return;
+    }
+
+    if (data instanceof Blob) {
+      console.log(`[Audio] Received blob chunk: ${data.size} bytes`);
       playAudioBuffer(data);
       return;
     }
@@ -142,6 +154,12 @@ function App() {
           setTranscript('');
           setTranslatedText('');
           audioQueueRef.current = [];
+
+          // AudioContext check on join
+          if (window.sharedAudioContext && window.sharedAudioContext.state === 'suspended') {
+            console.warn('[Audio] AudioContext is suspended. Trying to resume...');
+            window.sharedAudioContext.resume();
+          }
         } else if (msg.type === 'error') {
           alert('SonicBridge System: ' + msg.message);
           setCurrentView('portal');
@@ -159,7 +177,8 @@ function App() {
         console.error('Error parsing WS message:', e);
       }
     } else {
-      // Binary audio data
+      // Fallback for other binary types (like Uint8Array)
+      console.log('[Audio] Received unknown data type:', typeof data);
       playAudioBuffer(data);
     }
   }, [playAudioBuffer]);
@@ -167,6 +186,17 @@ function App() {
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const fallbackUrl = isLocal ? `ws://${window.location.hostname}:5001` : 'wss://sonicbridge-backend.onrender.com';
   const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
+
+  // Wake up Render server immediately on mount to mitigate cold start delay
+  useEffect(() => {
+    if (wsUrl) {
+      const httpUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+      fetch(`${httpUrl}/health`).catch(() => {
+        // Silently fail, we just want to trigger the wake-up
+      });
+    }
+  }, [wsUrl]);
+
   const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
 
   // Host ping interval for real-time latency calculate
@@ -242,7 +272,14 @@ function App() {
 
         <div className="pt-8">
           <button
-            onClick={() => setCurrentView('portal')}
+            onClick={() => {
+              // Initialize AudioContext early on first user interaction
+              if (!window.sharedAudioContext) {
+                window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('[Audio] Shared context initialized via ENTER gesture');
+              }
+              setCurrentView('portal');
+            }}
             className="group relative flex w-32 h-32 md:w-40 md:h-40 items-center justify-center rounded-full bg-charcoal dark:bg-white text-white dark:text-charcoal transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20 hover:scale-[1.05]"
           >
             <span className="dot-matrix-logo text-[10px] md:text-xs tracking-widest font-bold">ENTER</span>
@@ -275,17 +312,23 @@ function App() {
         {/* Create Room */}
         <div
           onClick={() => {
+            if (!isConnected) return;
             sendMessage(JSON.stringify({ type: 'createRoom' }));
           }}
-          className="premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group"
+          className={`premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          <h2 className="dot-matrix text-[10px] tracking-[0.4em] opacity-40">Create Room</h2>
+          <h2 className="dot-matrix text-[10px] tracking-[0.4em] opacity-40">
+            {isConnected ? 'Create Room' : 'Service Waking Up...'}
+          </h2>
           <div className="w-full flex-col flex items-center justify-center flex-1">
-            <button className="w-20 h-20 rounded-full charcoal-circle flex items-center justify-center pointer-events-none">
-              <div className="w-2 h-2 bg-white dark:bg-black rounded-full transition-transform group-hover:scale-150"></div>
+            <button className={`w-20 h-20 rounded-full charcoal-circle flex items-center justify-center pointer-events-none ${!isConnected ? 'animate-pulse' : ''}`}>
+              <div className={`w-2 h-2 bg-white dark:bg-black rounded-full transition-transform ${isConnected ? 'group-hover:scale-150' : ''}`}></div>
             </button>
+            {!isConnected && <p className="text-[10px] uppercase tracking-widest mt-4 opacity-30 animate-pulse">Establishing Connection</p>}
           </div>
-          <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">Session Start</p>
+          <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">
+            {isConnected ? 'Session Start' : 'Please Wait'}
+          </p>
         </div>
 
         {/* Join Room */}
@@ -301,6 +344,7 @@ function App() {
             />
             <button
               onClick={() => {
+                if (!isConnected) return;
                 // Initialize AudioContext during explicit user interaction to bypass Autoplay Policies
                 if (!window.sharedAudioContext) {
                   window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -314,9 +358,10 @@ function App() {
                   sendMessage(JSON.stringify({ type: 'joinRoom', roomId: upperCode, targetLang }));
                 }
               }}
-              className="btn-outline w-full max-w-[200px]"
+              disabled={!isConnected}
+              className={`btn-outline w-full max-w-[200px] ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              Connect
+              {isConnected ? 'Connect' : 'Initializing...'}
             </button>
           </div>
           <p className="text-[9px] uppercase tracking-[0.5em] font-medium opacity-30 mt-auto">Secure Entry</p>
