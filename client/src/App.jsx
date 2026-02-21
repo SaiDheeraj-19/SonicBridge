@@ -35,6 +35,7 @@ function App() {
 
   const [hostLeftCountdown, setHostLeftCountdown] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   // Handle active theme class on body
   useEffect(() => {
@@ -131,6 +132,7 @@ function App() {
         } else if (msg.type === 'translation') {
           setTranslatedText(prev => prev + ' ' + msg.text);
         } else if (msg.type === 'roomCreated') {
+          setIsCreatingRoom(false);
           setRoomCode(msg.roomId);
           setCurrentView('host');
           setTranscript('');
@@ -143,6 +145,7 @@ function App() {
           setTranslatedText('');
           audioQueueRef.current = [];
         } else if (msg.type === 'error') {
+          setIsCreatingRoom(false);
           alert('SonicBridge System: ' + msg.message);
           setCurrentView('portal');
           setRoomCode('');
@@ -272,6 +275,15 @@ function App() {
         {/* Create Room */}
         <div
           onClick={() => {
+            // Initialize AudioContext during explicit user interaction
+            if (!window.sharedAudioContext) {
+              window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (window.sharedAudioContext.state === 'suspended') {
+              window.sharedAudioContext.resume();
+            }
+
+            setIsCreatingRoom(true);
             sendMessage(JSON.stringify({ type: 'createRoom' }));
           }}
           className="premium-card w-full md:w-[420px] h-[480px] rounded-[32px] flex flex-col items-center justify-between p-16 text-center cursor-pointer group"
@@ -333,6 +345,22 @@ function App() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1px] h-24 bg-gradient-to-b from-[#E5E5E5] dark:from-white/10 to-transparent"></div>
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[1px] h-24 bg-gradient-to-t from-[#E5E5E5] dark:from-white/10 to-transparent"></div>
       </div>
+
+      {/* Creating Room Popup */}
+      {isCreatingRoom && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-paper-white/60 dark:bg-black/60 backdrop-blur-xl animate-fade-in">
+          <div className="flex flex-col items-center gap-8">
+            <div className="relative size-24">
+              <div className="absolute inset-0 rounded-full border-2 border-charcoal/5 dark:border-white/5"></div>
+              <div className="absolute inset-0 rounded-full border-t-2 border-charcoal dark:border-white animate-spin"></div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <h3 className="dot-matrix text-[10px] tracking-[0.5em] opacity-40 uppercase">Establishing Link</h3>
+              <p className="small-caps text-[11px] font-medium opacity-80">Building Your Secure Workspace...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
