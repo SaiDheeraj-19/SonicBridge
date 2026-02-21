@@ -117,6 +117,11 @@ function App() {
   }, []);
 
   const onWebSocketMessage = useCallback((data) => {
+    if (data instanceof ArrayBuffer || data instanceof Blob) {
+      playAudioBuffer(data);
+      return;
+    }
+
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
