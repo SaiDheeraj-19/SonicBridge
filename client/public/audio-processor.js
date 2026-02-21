@@ -1,7 +1,7 @@
 class AudioStreamProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
-        this.bufferSize = 4096; // Adjust based on sampling rate and chunk goal
+        this.bufferSize = 2048; // 128ms at 16kHz — optimized for low latency
         this.buffer = new Float32Array(this.bufferSize);
         this.bufferIndex = 0;
     }

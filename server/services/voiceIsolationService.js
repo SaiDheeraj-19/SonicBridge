@@ -8,13 +8,28 @@ const SPEECHBRAIN_URL = process.env.SPEECHBRAIN_URL || 'http://localhost:8000';
 class VoiceIsolationService {
     constructor() {
         this.vadEnabled = true;
-        this.rnnoiseEnabled = true;
-        this.embeddingVerificationEnabled = true;
+        this.rnnoiseEnabled = false; // Disabled: no native bindings in production
+        this.embeddingVerificationEnabled = false; // Disabled by default: enable only if SpeechBrain microservice is running
 
         console.log("Voice Isolation System Loaded:");
         console.log("- WebRTC VAD [Active]");
-        console.log("- RNNoise Neural Suppression [Active]");
-        console.log(`- SpeechBrain Embedding [Microservice: ${SPEECHBRAIN_URL}]`);
+        console.log("- RNNoise Neural Suppression [Disabled - No Native Bindings]");
+        console.log(`- SpeechBrain Embedding [Checking: ${SPEECHBRAIN_URL}]`);
+
+        // Auto-detect SpeechBrain microservice
+        this._checkSpeechBrain();
+    }
+
+    async _checkSpeechBrain() {
+        try {
+            const res = await axios.get(`${SPEECHBRAIN_URL}/health`, { timeout: 2000 });
+            if (res.status === 200) {
+                this.embeddingVerificationEnabled = true;
+                console.log("- SpeechBrain Embedding [Active - Microservice Online]");
+            }
+        } catch {
+            console.log("- SpeechBrain Embedding [Disabled - Microservice Offline]");
+        }
     }
 
     /**

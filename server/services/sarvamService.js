@@ -119,7 +119,7 @@ class SarvamService {
                 console.error('[Sarvam REST STT] Error:', errorMsg);
                 if (onError) onError(new Error(`Sarvam API: ${errorMsg}`));
             }
-        }, 2500); // 2.5-second intervals for better accuracy with sufficient audio context
+        }, 2000); // 2.0s — balanced: enough context for accuracy, low enough for responsiveness
 
         return pseudoWs;
     }

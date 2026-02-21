@@ -690,12 +690,11 @@ function App() {
         </div>
       </main>
 
-      {/* Audio Debug Telemetry */}
-      <div className="fixed bottom-0 left-0 w-full bg-black/80 text-white px-4 py-2 flex items-center justify-center gap-6 z-30 text-[10px] font-mono uppercase tracking-wider">
-        <span>Audio Received: <span className={audioDebug.received > 0 ? 'text-green-400' : 'text-red-400'}>{audioDebug.received}</span></span>
-        <span>Played: <span className={audioDebug.played > 0 ? 'text-green-400' : 'text-yellow-400'}>{audioDebug.played}</span></span>
-        <span>Errors: <span className={audioDebug.errors > 0 ? 'text-red-400' : 'text-green-400'}>{audioDebug.errors}</span></span>
-        {audioDebug.lastError && <span className="text-red-400">Last: {audioDebug.lastError.substring(0, 50)}</span>}
+      {/* Audio Status - minimal indicator */}
+      <div className="fixed bottom-2 right-4 z-30 text-[9px] font-mono uppercase tracking-wider opacity-30 hover:opacity-100 transition-opacity">
+        <span className={audioDebug.received > 0 ? 'text-green-400' : 'text-red-400'}>●</span>
+        <span className="text-white/60 ml-1">{audioDebug.played}/{audioDebug.received}</span>
+        {audioDebug.errors > 0 && <span className="text-red-400 ml-2">ERR:{audioDebug.errors}</span>}
       </div>
 
       <div className="fixed top-0 left-0 w-full h-[2px] bg-primary-green/20 overflow-hidden z-20 pointer-events-none">

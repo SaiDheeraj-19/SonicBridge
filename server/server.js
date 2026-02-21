@@ -281,74 +281,57 @@ wss.on('connection', (ws) => {
             return;
         }
 
-        // Handle binary audio data
+        // Handle binary audio data — HOT PATH: must be as fast as possible
         if (isBinary) {
-            if (!isHost || !currentRoomId || !rooms.has(currentRoomId)) {
-                // Reject unauthorized audio injection from users
-                console.warn('Unauthorized audio chunk rejected from non-host client.');
-                return;
-            }
+            if (!isHost || !currentRoomId || !rooms.has(currentRoomId)) return;
 
             const room = rooms.get(currentRoomId);
 
-            // LAYER 3: Voice Activity Detection (Ignore silence chunks to save Sarvam Server Quota)
-            const hasVoice = voiceIsolationService.checkVoiceActivity(message);
-            if (!hasVoice) return; // Drop chunk silently
+            // LAYER 3: Voice Activity Detection (Ignore silence to save API quota)
+            if (!voiceIsolationService.checkVoiceActivity(message)) return;
 
             if (room.sarvamWs && room.sarvamWs.readyState === 1) {
-                console.log(`[Audio] Received ${message.length} bytes from host in room ${currentRoomId}`);
-                // LAYER 2: RNNoise Suppression
-                const cleanBuffer = await voiceIsolationService.applyRNNoise(message);
+                // LAYER 2: RNNoise (pass-through when disabled)
+                const cleanBuffer = voiceIsolationService.rnnoiseEnabled
+                    ? await voiceIsolationService.applyRNNoise(message)
+                    : message;
 
-                if (!room.hostEmbedding) {
-                    // Accumulate 5 seconds of audio for Voice Enrollment (5s * 32KB/s = 160000 bytes)
-                    room.enrollmentBuffer.push(cleanBuffer);
-                    room.enrollmentLength += cleanBuffer.length;
-
-                    if (room.enrollmentLength >= 160000 && !room.isEnrolling) {
-                        room.isEnrolling = true;
-                        const fullEnrollmentBuf = Buffer.concat(room.enrollmentBuffer);
-                        console.log(`[SpeechBrain] Initiating Host embedding enrollment for ${currentRoomId}`);
-
-                        voiceIsolationService.enrollHostVoice(fullEnrollmentBuf).then(emb => {
-                            if (emb) room.hostEmbedding = emb;
-                            console.log(`[SpeechBrain] Host embedding generated and locked under Room ${currentRoomId}`);
-                        });
-                    }
-                } else {
-                    // LAYER 4: Verify Speaker (Throws/Drops if intruder bypasses websocket bounds)
-                    const isSpeakerMatch = await voiceIsolationService.verifySpeaker(cleanBuffer, room.hostEmbedding);
-                    if (!isSpeakerMatch) {
-                        console.warn(`[SpeechBrain] Discarded non-host voice segment in room ${currentRoomId}`);
-                        // Notify host or logs
-                        return;
+                // LAYER 4: SpeechBrain verification (skip entirely when disabled)
+                if (voiceIsolationService.embeddingVerificationEnabled) {
+                    if (!room.hostEmbedding) {
+                        room.enrollmentBuffer.push(cleanBuffer);
+                        room.enrollmentLength += cleanBuffer.length;
+                        if (room.enrollmentLength >= 160000 && !room.isEnrolling) {
+                            room.isEnrolling = true;
+                            const fullBuf = Buffer.concat(room.enrollmentBuffer);
+                            voiceIsolationService.enrollHostVoice(fullBuf).then(emb => {
+                                if (emb) room.hostEmbedding = emb;
+                            });
+                        }
+                    } else {
+                        const match = await voiceIsolationService.verifySpeaker(cleanBuffer, room.hostEmbedding);
+                        if (!match) return;
                     }
                 }
 
-                const dataLength = cleanBuffer.length;
-                const buffer = Buffer.alloc(44);
-                buffer.write('RIFF', 0);
-                buffer.writeUInt32LE(dataLength + 36, 4);
-                buffer.write('WAVE', 8);
-                buffer.write('fmt ', 12);
-                buffer.writeUInt32LE(16, 16);
-                buffer.writeUInt16LE(1, 20);
-                buffer.writeUInt16LE(1, 22);
-                buffer.writeUInt32LE(16000, 24);
-                buffer.writeUInt32LE(16000 * 1 * 16 / 8, 28);
-                buffer.writeUInt16LE(1 * 16 / 8, 32);
-                buffer.writeUInt16LE(16, 34);
-                buffer.write('data', 36);
-                buffer.writeUInt32LE(dataLength, 40);
-
-                const wavBuffer = Buffer.concat([buffer, cleanBuffer]);
+                // Fast WAV header construction + forward to STT
+                const len = cleanBuffer.length;
+                const hdr = Buffer.alloc(44);
+                hdr.write('RIFF', 0);
+                hdr.writeUInt32LE(len + 36, 4);
+                hdr.write('WAVEfmt ', 8);
+                hdr.writeUInt32LE(16, 16);
+                hdr.writeUInt16LE(1, 20);   // PCM
+                hdr.writeUInt16LE(1, 22);   // mono
+                hdr.writeUInt32LE(16000, 24); // sample rate
+                hdr.writeUInt32LE(32000, 28); // byte rate
+                hdr.writeUInt16LE(2, 32);   // block align
+                hdr.writeUInt16LE(16, 34);  // bits per sample
+                hdr.write('data', 36);
+                hdr.writeUInt32LE(len, 40);
 
                 room.sarvamWs.send(JSON.stringify({
-                    audio: {
-                        data: wavBuffer.toString('base64'),
-                        encoding: "audio/wav",
-                        sample_rate: 16000
-                    }
+                    audio: { data: Buffer.concat([hdr, cleanBuffer]).toString('base64'), encoding: "audio/wav", sample_rate: 16000 }
                 }));
             }
         }
