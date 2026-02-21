@@ -15,6 +15,7 @@ export const useWebSocket = (url, onMessage) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
         const ws = new WebSocket(url);
+        ws.binaryType = 'arraybuffer';
         wsRef.current = ws;
 
         ws.onopen = () => {
