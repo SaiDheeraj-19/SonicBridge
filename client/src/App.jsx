@@ -560,7 +560,7 @@ function App() {
 
         <div className="w-full max-w-4xl h-[65vh] flex flex-col gap-12 custom-scrollbar overflow-y-auto pb-32 sm:pb-24 z-10 mx-auto px-4 mt-12 sm:mt-16 transcript-container">
           <div className="mt-auto text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight text-center tracking-tight text-charcoal dark:text-white transition-opacity duration-300">
-            {translatedText ? translatedText : <span className="opacity-40 italic font-light text-xl sm:text-2xl md:text-4xl text-center">Waiting for host audio...</span>}
+            {translatedText ? translatedText : (transcript ? <span className="opacity-60 font-light">{transcript}</span> : <span className="opacity-40 italic font-light text-xl sm:text-2xl md:text-4xl text-center">Waiting for host audio...</span>)}
           </div>
         </div>
 

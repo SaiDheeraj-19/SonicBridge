@@ -124,35 +124,27 @@ class SarvamService {
         if (targetLanguageCode === sourceLanguageCode) return text;
 
         try {
-            console.log(`[Sarvam Translate] ${sourceLanguageCode} -> ${targetLanguageCode}`);
-            const response = await fetch('https://api.sarvam.ai/translate', {
-                method: "POST",
+            const response = await axios.post('https://api.sarvam.ai/translate', {
+                input: text.trim(),
+                source_language_code: sourceLanguageCode,
+                target_language_code: targetLanguageCode,
+                speaker_gender: "Male",
+                mode: "formal",
+                model: "mayura:v1",
+                enable_preprocessing: false,
+                numerals_format: "native"
+            }, {
                 headers: {
                     "api-subscription-key": this.apiKey,
                     "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    input: text.trim(),
-                    source_language_code: sourceLanguageCode,
-                    target_language_code: targetLanguageCode,
-                    speaker_gender: "Male",
-                    mode: "formal",
-                    model: "mayura:v1",
-                    enable_preprocessing: false,
-                    numerals_format: "native"
-                })
+                }
             });
 
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`Translate HTTP error! status: ${response.status}, msg: ${errText}`);
-            }
-
-            const data = await response.json();
-            return data.translated_text;
+            return response.data.translated_text;
         } catch (error) {
-            console.error('Sarvam Translate error:', error.message);
-            throw error;
+            const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            console.error('[Sarvam Translate] error:', errorMsg);
+            throw new Error(`Translate Failed: ${errorMsg}`);
         }
     }
 

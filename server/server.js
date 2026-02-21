@@ -130,7 +130,16 @@ wss.on('connection', (ws) => {
                             }
 
                             // Send host the raw transcription text
-                            room.hostWs.send(JSON.stringify({ type: 'transcript', text: textToShowHost }));
+                            if (room.hostWs && room.hostWs.readyState === 1) {
+                                room.hostWs.send(JSON.stringify({ type: 'transcript', text: textToShowHost }));
+                            }
+
+                            // Broadcast preview text to all users immediately
+                            room.users.forEach(u => {
+                                if (u.ws && u.ws.readyState === 1) {
+                                    u.ws.send(JSON.stringify({ type: 'transcript', text: textToShowHost }));
+                                }
+                            });
 
                             // Only process translation/TTS for final phrases to save performance
                             if (result.is_final && textToShowHost.trim().length > 0) {
@@ -145,13 +154,15 @@ wss.on('connection', (ws) => {
                                         const sourceText = result.translate || nativeText;
                                         const sourceLang = result.translate ? "en-IN" : data.sourceLang;
 
-                                        console.log(`[Pipeline] Processing ${targetLanguage} using source (${sourceLang}): "${sourceText.substring(0, 30)}..."`);
+                                        console.log(`[Pipeline] Room: ${currentRoomId} | Target: ${targetLanguage} | Lang Users: ${room.users.filter(u => u.language === targetLanguage).length}`);
+                                        console.log(`[Pipeline] Source (${sourceLang}): "${sourceText.substring(0, 30)}..."`);
 
                                         // 1. Translate
                                         const translatedText = await sarvamService.translateText(sourceText, targetLanguage, sourceLang);
-                                        console.log(`[Pipeline] Translated to ${targetLanguage}: "${translatedText.substring(0, 30)}..."`);
+                                        console.log(`[Pipeline] Success: ${targetLanguage} -> "${translatedText.substring(0, 30)}..."`);
 
                                         // 2. TTS
+                                        console.log(`[Pipeline] TTS for ${targetLanguage}...`);
                                         const audioBuffer = await sarvamService.textToSpeech(translatedText, targetLanguage);
 
                                         // 3. Broadcast
@@ -163,12 +174,13 @@ wss.on('connection', (ws) => {
                                                 sentCount++;
                                             }
                                         });
-                                        console.log(`[Pipeline] Broadcasted ${targetLanguage} audio to ${sentCount} users.`);
+                                        console.log(`[Pipeline] Broadcasted ${targetLanguage} to ${sentCount} users.`);
                                     } catch (err) {
-                                        console.error(`[Pipeline] Failed for ${targetLanguage}:`, err.message);
+                                        console.error(`[Pipeline] Error for ${targetLanguage}:`, err.message);
 
                                         // Fallback TTS: Try to at least speak the original native text if translation failed
                                         try {
+                                            console.log(`[Pipeline] Attempting fallback TTS for ${targetLanguage}...`);
                                             const fallbackAudio = await sarvamService.textToSpeech(textToShowHost, targetLanguage);
                                             room.users.forEach(user => {
                                                 if (user.language === targetLanguage && user.ws.readyState === 1) {
@@ -176,9 +188,9 @@ wss.on('connection', (ws) => {
                                                     user.ws.send(fallbackAudio);
                                                 }
                                             });
-                                            console.log(`[Pipeline] Sent fallback audio for ${targetLanguage}`);
+                                            console.log(`[Pipeline] Fallback native TTS delivered for ${targetLanguage}`);
                                         } catch (fallbackErr) {
-                                            console.error("[Pipeline] Fallback TTS also failed");
+                                            console.error("[Pipeline] Fallback TTS failed too:", fallbackErr.message);
                                         }
                                     }
                                 }));
