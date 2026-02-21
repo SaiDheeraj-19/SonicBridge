@@ -155,42 +155,31 @@ class SarvamService {
         }
     }
 
-    /**
-     * Convert text to speech using Sarvam TTS (Streaming API via Option 2)
-     * @param {String} text 
-     * @param {String} targetLanguageCode 
-     * @returns {Promise<Buffer>}
-     */
     async textToSpeech(text, targetLanguageCode) {
         try {
-            const response = await fetch('https://api.sarvam.ai/text-to-speech/stream', {
-                method: "POST",
+            const response = await axios.post('https://api.sarvam.ai/text-to-speech', {
+                inputs: [text],
+                target_language_code: targetLanguageCode,
+                speaker: "shubh", // "shubh" per user request
+                model: "bulbul:v3",
+                pace: 1.1,
+                enable_preprocessing: true
+            }, {
                 headers: {
                     "api-subscription-key": this.apiKey,
                     "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    text: text,
-                    target_language_code: targetLanguageCode,
-                    speaker: "shubh", // "shubh" per user request
-                    model: "bulbul:v3", // upgraded to v3
-                    pace: 1.1,
-                    speech_sample_rate: 22050,
-                    output_audio_codec: "mp3",
-                    enable_preprocessing: true
-                })
+                }
             });
 
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, msg: ${errText}`);
+            // Parse base64 string from bulbul:v3 back into a Buffer for WebSocket transmission
+            if (response.data && response.data.audios && response.data.audios.length > 0) {
+                return Buffer.from(response.data.audios[0], 'base64');
+            } else {
+                throw new Error("Invalid TTS response format");
             }
 
-            // Option 2: Collect all chunks natively on the server and return as one Buffer for the WebSocket
-            const arrayBuffer = await response.arrayBuffer();
-            return Buffer.from(arrayBuffer);
         } catch (error) {
-            console.error('Sarvam TTS error:', error.message);
+            console.error('Sarvam TTS error:', error.response?.data || error.message);
             throw error;
         }
     }
