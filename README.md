@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./logo.png" alt="SonicBridge Logo" width="350"/>
+  <img src="./client/public/favicon.png" alt="SonicBridge Logo" width="350"/>
   <br/>
   <h1>SonicBridge 🎙️⚡🌐</h1>
   <p><strong>Bridging voices through real-time AI translation.</strong></p>
