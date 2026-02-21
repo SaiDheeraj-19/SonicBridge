@@ -43,16 +43,20 @@ class VoiceIsolationService {
     checkVoiceActivity(pcmAudioBuffer) {
         if (!this.vadEnabled) return true;
 
-        // VAD integration usually requires @ricky0123/vad-node or native webrtc-vad.
-        // We calculate simple RMS energy as fallback local VAD approximation.
-        let energy = 0;
-        const int16View = new Int16Array(pcmAudioBuffer.buffer, pcmAudioBuffer.byteOffset, pcmAudioBuffer.length / 2);
-
-        for (let i = 0; i < int16View.length; i++) {
-            energy += Math.abs(int16View[i]);
+        if (pcmAudioBuffer.length % 2 !== 0) {
+            return false; // Invalid 16-bit PCM chunk
         }
 
-        const avgEnergy = energy / int16View.length;
+        let energy = 0;
+        const totalSamples = pcmAudioBuffer.length / 2;
+
+        for (let i = 0; i < pcmAudioBuffer.length; i += 2) {
+            // Read 16-bit signed integer (Little Endian)
+            const sample = pcmAudioBuffer.readInt16LE(i);
+            energy += Math.abs(sample);
+        }
+
+        const avgEnergy = energy / totalSamples;
 
         // Threshold tuning based on typical 16-bit PCM silence values
         return avgEnergy > 50;
