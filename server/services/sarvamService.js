@@ -24,35 +24,92 @@ class SarvamService {
             model = 'saaras:v2.5',
         } = options;
 
-        const url = `${SARVAM_STT_URL}?language_code=${language_code}&model=${model}`;
-        console.log("Connecting to Sarvam STT:", url);
+        console.log("Initializing Sarvam Buffered REST STT Strategy for:", language_code);
 
-        const ws = new WebSocket(url, {
-            headers: {
-                'api-subscription-key': this.apiKey
+        // Pseudo-WebSocket to mimic the interface for server.js
+        const pseudoWs = {
+            readyState: 1, // OPEN
+            audioBuffer: [],
+            interval: null,
+
+            send: (dataStr) => {
+                if (pseudoWs.readyState !== 1) return;
+                try {
+                    const parsed = JSON.parse(dataStr);
+                    if (parsed.audio && parsed.audio.data) {
+                        const chunkBuf = Buffer.from(parsed.audio.data, 'base64');
+                        // Strip the 44-byte WAV header so we can concatenate raw PCM cleanly,
+                        // or just buffer the whole thing if we are only sending 1 big WAV per POST.
+                        pseudoWs.audioBuffer.push(chunkBuf.subarray(44));
+                    }
+                } catch (e) {
+                    console.error("PseudoWS parse error:", e.message);
+                }
+            },
+
+            close: () => {
+                pseudoWs.readyState = 3; // CLOSED
+                if (pseudoWs.interval) clearInterval(pseudoWs.interval);
+                pseudoWs.audioBuffer = [];
+                console.log('Sarvam STT Stream (Pseudo) Closed');
             }
-        });
+        };
 
-        ws.on('open', () => {
-            console.log('Connected to Sarvam STT Stream');
-        });
+        // Every 2 seconds, grab the buffer, wrap in WAV, and send to Sarvam REST
+        pseudoWs.interval = setInterval(async () => {
+            if (pseudoWs.audioBuffer.length === 0) return;
 
-        ws.on('message', (data) => {
+            // Combine all raw PCM chunks
+            const rawPcm = Buffer.concat(pseudoWs.audioBuffer);
+            pseudoWs.audioBuffer = []; // Clear for next batch
+
+            // Re-wrap in a single WAV header
+            const dataLength = rawPcm.length;
+            const wavHeader = Buffer.alloc(44);
+            wavHeader.write('RIFF', 0);
+            wavHeader.writeUInt32LE(dataLength + 36, 4);
+            wavHeader.write('WAVE', 8);
+            wavHeader.write('fmt ', 12);
+            wavHeader.writeUInt32LE(16, 16);
+            wavHeader.writeUInt16LE(1, 20);
+            wavHeader.writeUInt16LE(1, 22);
+            wavHeader.writeUInt32LE(16000, 24);
+            wavHeader.writeUInt32LE(16000 * 1 * 16 / 8, 28);
+            wavHeader.writeUInt16LE(1 * 16 / 8, 32);
+            wavHeader.writeUInt16LE(16, 34);
+            wavHeader.write('data', 36);
+            wavHeader.writeUInt32LE(dataLength, 40);
+
+            const finalWav = Buffer.concat([wavHeader, rawPcm]);
+
             try {
-                const response = JSON.parse(data.toString());
-                console.log("Sarvam STT Raw Response:", response);
-                onTranscript(response);
+                // Submit to REST API
+                const FormData = (await import('form-data')).default;
+                const form = new FormData();
+                form.append('file', finalWav, { filename: 'chunk.wav', contentType: 'audio/wav' });
+                form.append('language_code', language_code);
+                form.append('model', model);
+
+                const response = await axios.post('https://api.sarvam.ai/speech-to-text-translate', form, {
+                    headers: {
+                        'api-subscription-key': this.apiKey,
+                        ...form.getHeaders()
+                    }
+                });
+
+                if (response.data && response.data.transcript) {
+                    console.log("[Sarvam REST STT] Got transcript:", response.data.transcript);
+                    onTranscript({
+                        transcript: response.data.transcript,
+                        is_final: true // Trigger translation/TTS down the line
+                    });
+                }
             } catch (err) {
-                console.error('Error parsing Sarvam STT message:', err);
+                console.error('[Sarvam REST STT] Error:', err.response?.data || err.message);
             }
-        });
+        }, 3000); // 3-second intervals for stable translation phrases
 
-        ws.on('error', (err) => {
-            console.error('Sarvam STT WebSocket error:', err);
-            onError(err);
-        });
-
-        return ws;
+        return pseudoWs;
     }
 
     /**
