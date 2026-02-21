@@ -35,7 +35,7 @@ export const useWebSocket = (url, onMessage) => {
 
             reconnectTimeoutRef.current = setTimeout(() => {
                 if (connectRef.current) connectRef.current();
-            }, 3000);
+            }, 1000);
         };
 
         ws.onerror = (error) => {

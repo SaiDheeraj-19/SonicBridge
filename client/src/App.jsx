@@ -187,15 +187,28 @@ function App() {
   const fallbackUrl = isLocal ? `ws://${window.location.hostname}:5001` : 'wss://sonicbridge-backend.onrender.com';
   const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
 
-  // Wake up Render server immediately on mount to mitigate cold start delay
+  // Wake up Render server aggressively on mount to mitigate cold start delay
   useEffect(() => {
-    if (wsUrl) {
-      const httpUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
-      fetch(`${httpUrl}/health`).catch(() => {
-        // Silently fail, we just want to trigger the wake-up
-      });
-    }
-  }, [wsUrl]);
+    if (!wsUrl || isConnected) return;
+
+    const httpUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+
+    // Initial wake-up call
+    const wakeUp = () => {
+      fetch(`${httpUrl}/health`).catch(() => { });
+    };
+
+    wakeUp();
+
+    // Repeated pings every 3s until we are connected
+    const pinger = setInterval(() => {
+      if (!isConnected) {
+        wakeUp();
+      }
+    }, 3000);
+
+    return () => clearInterval(pinger);
+  }, [wsUrl, isConnected]);
 
   const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
 
