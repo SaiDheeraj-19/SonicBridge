@@ -174,17 +174,13 @@ wss.on('connection', (ws) => {
                                 room.hostWs.send(JSON.stringify({ type: 'transcript', text: textToShowHost }));
                             }
 
-                            // Broadcast preview text to all users immediately
-                            room.users.forEach(u => {
-                                if (u.ws && u.ws.readyState === 1) {
-                                    u.ws.send(JSON.stringify({ type: 'transcript', text: textToShowHost }));
-                                }
-                            });
+                            // NOTE: Don't send raw transcript to participants!
+                            // They should only see translated text in their target language.
+                            // Sending English preview was causing participants to see English even with Telugu selected.
 
-                            // Only process translation/TTS for final phrases with enough content
-                            // Minimum 3 words for TTS to avoid wasting API calls on fragments
+                            // Process translation/TTS for final phrases (minimum 2 words)
                             const finalWordCount = textToShowHost.trim().split(/\s+/).length;
-                            if (result.is_final && textToShowHost.trim().length > 0 && finalWordCount >= 3) {
+                            if (result.is_final && textToShowHost.trim().length > 0 && finalWordCount >= 2) {
                                 // Find unique languages requested in the room
                                 const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
 
