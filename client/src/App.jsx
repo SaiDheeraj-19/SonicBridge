@@ -187,6 +187,8 @@ function App() {
   const fallbackUrl = isLocal ? `ws://${window.location.hostname}:5001` : 'wss://sonicbridge-backend.onrender.com';
   const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
 
+  const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
+
   // Wake up Render server aggressively on mount to mitigate cold start delay
   useEffect(() => {
     if (!wsUrl || isConnected) return;
@@ -209,8 +211,6 @@ function App() {
 
     return () => clearInterval(pinger);
   }, [wsUrl, isConnected]);
-
-  const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
 
   // Host ping interval for real-time latency calculate
   useEffect(() => {

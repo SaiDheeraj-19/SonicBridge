@@ -104,7 +104,9 @@ class SarvamService {
                     });
                 }
             } catch (err) {
-                console.error('[Sarvam REST STT] Error:', err.response?.data || err.message);
+                const errorMsg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+                console.error('[Sarvam REST STT] Error:', errorMsg);
+                if (onError) onError(new Error(`Sarvam API: ${errorMsg}`));
             }
         }, 1200); // 1.2-second intervals for reduced latency while maintaining coherent STT
 
