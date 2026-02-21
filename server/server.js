@@ -153,26 +153,25 @@ wss.on('connection', (ws) => {
                             const words = lowerText.split(/\s+/);
                             if (words.length >= 2 && new Set(words).size === 1) return;
 
-                            // === SENTENCE ACCUMULATION (Classroom-grade) ===
-                            // Accumulate text until sentence boundary for better translation quality
+                            // === SENTENCE ACCUMULATION ===
                             room.sentenceBuffer += ' ' + trimmed;
-                            room.lastTranslate = (result.translate || '') + ' ' + (room.lastTranslate || '');
+                            room.lastTranslate = (room.lastTranslate || '') + ' ' + (result.translate || '');
 
                             // Send host live transcript immediately
                             if (room.hostWs && room.hostWs.readyState === 1) {
                                 room.hostWs.send(JSON.stringify({ type: 'transcript', text: trimmed }));
                             }
 
-                            // Determine if we should flush the sentence buffer for translation
-                            const hasSentenceEnd = /[.!?।॥]\s*$/.test(room.sentenceBuffer.trim());
+                            // Flush conditions — must be aggressive enough that translation actually happens
+                            const hasSentenceEnd = /[.!?।॥]/.test(room.sentenceBuffer.trim());
                             const timeSinceLastSentence = Date.now() - room.lastSentenceTime;
                             const bufferWordCount = room.sentenceBuffer.trim().split(/\s+/).length;
 
-                            // Flush conditions: sentence ending OR 6+ seconds since last flush OR 15+ words accumulated
+                            // Flush when: sentence ending detected OR 4+ words OR 4+ seconds elapsed
                             const shouldFlush = result.is_final && (
                                 hasSentenceEnd ||
-                                timeSinceLastSentence > 6000 ||
-                                bufferWordCount >= 15
+                                bufferWordCount >= 4 ||
+                                timeSinceLastSentence > 4000
                             );
 
                             if (!shouldFlush) return;
