@@ -138,7 +138,9 @@ function App() {
     }
   }, [playAudioBuffer]);
 
-  const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:5001`;
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const fallbackUrl = isLocal ? `ws://${window.location.hostname}:5001` : 'wss://sonicbridge-backend.onrender.com';
+  const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
   const { isConnected, sendMessage } = useWebSocket(wsUrl, onWebSocketMessage);
 
   // Host ping interval for real-time latency calculate
