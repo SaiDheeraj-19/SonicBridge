@@ -61,7 +61,8 @@ function convertFloat32ToInt16(buffer) {
     let l = buffer.length;
     let buf = new Int16Array(l);
     while (l--) {
-        buf[l] = Math.min(1, buffer[l]) * 0x7FFF;
+        const s = Math.max(-1, Math.min(1, buffer[l]));
+        buf[l] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     return buf.buffer;
 }

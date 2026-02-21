@@ -74,10 +74,11 @@ wss.on('connection', (ws) => {
                     const roomId = data.roomId;
                     if (rooms.has(roomId)) {
                         const room = rooms.get(roomId);
-                        room.users.push({ ws, language: data.targetLang });
+                        const userLang = data.language || data.targetLang || 'hi-IN';
+                        room.users.push({ ws, language: userLang });
                         currentRoomId = roomId;
                         isHost = false;
-                        console.log(`User joined room ${roomId} with language ${data.targetLang}`);
+                        console.log(`User joined room ${roomId} with language ${userLang}`);
                         ws.send(JSON.stringify({ type: 'joined', roomId }));
 
                         // Notify host of new join
@@ -93,8 +94,11 @@ wss.on('connection', (ws) => {
                         const room = rooms.get(currentRoomId);
                         const user = room.users.find(u => u.ws === ws);
                         if (user) {
-                            user.language = data.targetLang;
-                            console.log(`User updated language to ${data.targetLang} in room ${currentRoomId}`);
+                            const newLang = data.language || data.targetLang;
+                            if (newLang) {
+                                user.language = newLang;
+                                console.log(`User updated language to ${newLang} in room ${currentRoomId}`);
+                            }
                         }
                     }
                 }
@@ -148,6 +152,10 @@ wss.on('connection', (ws) => {
 
                                 // Optimization: Process each language parallelly
                                 await Promise.all(uniqueLanguages.map(async (targetLanguage) => {
+                                    if (!targetLanguage || typeof targetLanguage !== 'string') {
+                                        console.warn(`[Pipeline] Skipping invalid target language: ${targetLanguage}`);
+                                        return;
+                                    }
                                     try {
                                         // Determine source language for translation
                                         // If Sarvam gave us a 'translate' field, it's English. Otherwise it's native.

@@ -215,7 +215,7 @@ function App() {
     if (currentView === 'participant' && roomCode) {
       setTranslatedText('');
       audioQueueRef.current = [];
-      sendMessage(JSON.stringify({ type: 'updateLanguage', targetLang: newLang }));
+      sendMessage(JSON.stringify({ type: 'updateLanguage', language: newLang }));
     }
   };
 
@@ -355,7 +355,7 @@ function App() {
 
                 if (joinCode) {
                   const upperCode = joinCode.toUpperCase();
-                  sendMessage(JSON.stringify({ type: 'joinRoom', roomId: upperCode, targetLang }));
+                  sendMessage(JSON.stringify({ type: 'joinRoom', roomId: upperCode, language: targetLang }));
                 }
               }}
               disabled={!isConnected}

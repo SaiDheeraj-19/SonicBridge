@@ -36,12 +36,9 @@ class SarvamService {
                 if (pseudoWs.readyState !== 1) return;
                 try {
                     const parsed = JSON.parse(dataStr);
-                    if (parsed.audio && parsed.audio.data) {
-                        const chunkBuf = Buffer.from(parsed.audio.data, 'base64');
-                        // Strip the 44-byte WAV header so we can concatenate raw PCM cleanly,
-                        // or just buffer the whole thing if we are only sending 1 big WAV per POST.
-                        pseudoWs.audioBuffer.push(chunkBuf.subarray(44));
-                    }
+                    const chunkBuf = Buffer.from(parsed.audio.data, 'base64');
+                    // No longer skipping 44 bytes as host sends raw PCM chunks, not WAV files.
+                    pseudoWs.audioBuffer.push(chunkBuf);
                 } catch (e) {
                     console.error("PseudoWS parse error:", e.message);
                 }
@@ -101,7 +98,8 @@ class SarvamService {
                     console.log("[Sarvam REST STT] Got transcript:", response.data.transcript);
                     onTranscript({
                         transcript: response.data.transcript,
-                        translate: response.data.translate || response.data.transcript, // Fallback if no translate provided
+                        // Sarvam may return translation in 'translate', 'translate_transcript' or we fallback to 'transcript'
+                        translate: response.data.translate || response.data.translate_transcript || response.data.transcript,
                         is_final: true
                     });
                 }
@@ -153,13 +151,13 @@ class SarvamService {
             // Recommendation for bulbul:v3 speakers per language
             const speakerMap = {
                 'hi-IN': 'shubh',
-                'kn-IN': 'meera',
-                'ml-IN': 'meera',
-                'mr-IN': 'meera',
-                'ta-IN': 'pavithra',
-                'te-IN': 'sruthi',
-                'bn-IN': 'meera',
-                'en-IN': 'meera'
+                'kn-IN': 'shruti', // Fixed from meera to shruti for consistency
+                'ml-IN': 'shruti',
+                'mr-IN': 'shruti',
+                'ta-IN': 'kavitha', // Fixed: pavithra was invalid, kavitha is valid
+                'te-IN': 'shruti',  // Fixed: sruthi was invalid, shruti is valid
+                'bn-IN': 'shruti',
+                'en-IN': 'shruti'
             };
 
             const speaker = speakerMap[targetLanguageCode] || 'meera';
