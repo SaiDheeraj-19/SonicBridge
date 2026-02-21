@@ -111,15 +111,23 @@ wss.on('connection', (ws) => {
                         },
                         async (result) => {
                             // Extract primary translation (which defaults to English output from STT-Translate)
-                            const text = result.transcript || result.translate;
+                            let text = result.transcript || result.translate;
 
-                            // Send host the raw transcription text
-                            if (text) {
-                                room.hostWs.send(JSON.stringify({ type: 'transcript', text: text }));
+                            if (!text) return;
+
+                            // Filter out common AI silence hallucinations
+                            const lowerText = text.trim().toLowerCase().replace(/[^a-z]/g, '');
+                            const hallucinations = ['yes', 'yeah', 'okay', 'ok', 'mhm', 'hmm', 'ah', 'oh'];
+                            if (hallucinations.includes(lowerText)) {
+                                console.log(`[STT Anti-Hallucination] Dropped silence artifact: "${text}"`);
+                                return;
                             }
 
+                            // Send host the raw transcription text
+                            room.hostWs.send(JSON.stringify({ type: 'transcript', text: text }));
+
                             // Only process translation/TTS for final phrases to save performance
-                            if (result.is_final && text && text.trim().length > 0) {
+                            if (result.is_final && text.trim().length > 0) {
                                 // Find unique languages requested in the room
                                 const uniqueLanguages = [...new Set(room.users.map(u => u.language))];
 

@@ -77,7 +77,14 @@ function App() {
 
     try {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const decodedData = await audioContext.decodeAudioData(buffer);
+
+      // WebSocket returns binary messages as Blob. AudioContext requires ArrayBuffer.
+      let arrayBuffer = buffer;
+      if (buffer instanceof Blob) {
+        arrayBuffer = await buffer.arrayBuffer();
+      }
+
+      const decodedData = await audioContext.decodeAudioData(arrayBuffer);
       const source = audioContext.createBufferSource();
       source.buffer = decodedData;
       source.connect(audioContext.destination);
